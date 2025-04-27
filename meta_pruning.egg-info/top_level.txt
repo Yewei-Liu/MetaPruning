@@ -1,5 +1,5 @@
 data_loaders
 generate_dataset
+main
 nn
-pruning
 utils
