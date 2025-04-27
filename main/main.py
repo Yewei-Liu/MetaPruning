@@ -29,6 +29,7 @@ from utils.pruning import get_pruner, adaptive_pruning, pruning_one_step, progre
 from utils.train import train, eval
 from utils.visualize import visualize_acc_speed_up_curve
 from utils.meta_train import meta_train, meta_eval
+from utils.seed import set_seed
 
 from data_loaders.get_dataset_model import get_dataset_model_loader
 from data_loaders.get_dataset import get_dataset_loader
@@ -72,6 +73,9 @@ def main(cfg):
     logging.info(f'\n\n{OmegaConf.to_yaml(cfg)}')
     log = cfg.log
     run = cfg.run
+    seed = cfg.seed
+    set_seed(seed)
+    
     cfg = cfg.task
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -95,7 +99,7 @@ def main(cfg):
             matching_files = [
             os.path.join(save_dir, file)
             for file in all_files
-            if file.startswith(prefix) and os.path.isfile(os.path.join(save_dir, file))
+            if (file.startswith(prefix + '.') or file.startswith(prefix + '_')) and os.path.isfile(os.path.join(save_dir, file))
             ]
             if len(matching_files) == 0:
                 raise ValueError(f"no metanetwork found with index {index}")
@@ -130,7 +134,7 @@ def main(cfg):
         matching_files = [
         os.path.join(save_dir, file)
         for file in all_files
-        if file.startswith(prefix) and os.path.isfile(os.path.join(save_dir, file))
+        if (file.startswith(prefix + '.') or file.startswith(prefix + '_')) and os.path.isfile(os.path.join(save_dir, file))
         ]
         if len(matching_files) == 0:
             raise ValueError(f"no metanetwork found with index {index}")

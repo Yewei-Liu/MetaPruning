@@ -9,27 +9,31 @@ dataset:
   big_batch: 500
   small_batch: 128
   dataset_path: ../dataset/${task.dataset.dataset_name}
+  seed: ${seed}
 big_batch_dataset:
   dataset_name: ${task.dataset.dataset_name}
   batch_size: ${task.dataset.big_batch}
   num_workers: ${task.dataset.num_workers}
   dataset_path: ${task.dataset.dataset_path}
+  seed: ${seed}
 small_batch_dataset:
   dataset_name: ${task.dataset.dataset_name}
   batch_size: ${task.dataset.small_batch}
   num_workers: ${task.dataset.num_workers}
   dataset_path: ${task.dataset.dataset_path}
+  seed: ${seed}
 
 dataset_model:
   dataset_model_name: resnet56_on_CIFAR10
   train_split: 0.8
   dataset_model_path: ../dataset_model/${task.dataset_model.dataset_model_name}_level_${level}
+  seed: ${seed}
   # val_split = 1 - train_split
 
 meta_train:
-  epochs: 60
+  epochs: 100
   lr : 0.001 
-  lr_decay_milestones : "12"
+  lr_decay_milestones : "5"
   lr_decay_gamma : 0.1
   weight_decay : 5e-4
   method : ${method}

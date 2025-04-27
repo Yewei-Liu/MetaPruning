@@ -4,8 +4,19 @@ import torchvision
 from utils.logging import get_logger
 from omegaconf import OmegaConf
 import datasets
+import numpy as np
+import random
 
 def get_dataset_loader(cfg, log=False):    
+    seed = cfg.seed
+    def seed_worker(worker_id):
+        worker_seed = seed + worker_id
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+        torch.manual_seed(worker_seed)
+    generator = torch.Generator()
+    generator.manual_seed(seed)
+
     if cfg.dataset_name == 'CIFAR10':
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
@@ -20,11 +31,13 @@ def get_dataset_loader(cfg, log=False):
         trainset = torchvision.datasets.CIFAR10(
             root=cfg.dataset_path, train=True, download=True, transform=transform_train)
         train_loader = torch.utils.data.DataLoader(
-            trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers)
+            trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers, 
+            worker_init_fn=seed_worker, generator=generator)
         testset = torchvision.datasets.CIFAR10(
             root=cfg.dataset_path, train=False, download=True, transform=transform_test)
         test_loader = torch.utils.data.DataLoader(
-            testset, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers)
+            testset, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers,
+            worker_init_fn=seed_worker, generator=generator)
     elif cfg.dataset_name == 'CIFAR100':
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
@@ -39,47 +52,13 @@ def get_dataset_loader(cfg, log=False):
         trainset = torchvision.datasets.CIFAR100(
             root=cfg.dataset_path, train=True, download=True, transform=transform_train)
         train_loader = torch.utils.data.DataLoader(
-            trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers)
+            trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers,
+            worker_init_fn=seed_worker, generator=generator)
         testset = torchvision.datasets.CIFAR100(
             root=cfg.dataset_path, train=False, download=True, transform=transform_test)
         test_loader = torch.utils.data.DataLoader(
-            testset, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers)
-    # elif cfg.dataset_name == 'IMAGENET':
-    #     train_transform = transforms.Compose([
-    #         transforms.RandomResizedCrop(224),
-    #         transforms.RandomHorizontalFlip(),
-    #         transforms.ToTensor(),
-    #         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    #     ])
-    #     val_transform = transforms.Compose([
-    #         transforms.Resize(256),
-    #         transforms.CenterCrop(224),
-    #         transforms.ToTensor(),
-    #         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    #     ])
-    #     train_dataset = datasets.ImageFolder(
-    #         root='/path/to/imagenet/train',
-    #         transform=train_transform
-    #     )
-
-    #     val_dataset = datasets.ImageFolder(
-    #         root='/path/to/imagenet/val',
-    #         transform=val_transform
-    #     )
-    #     train_loader = torch.utils.data.DataLoader(
-    #         train_dataset,
-    #         batch_size=cfg.batch_size,
-    #         shuffle=True,
-    #         num_workers=cfg,
-    #         pin_memory=True
-    #     )
-    #     val_loader = torch.utils.data.DataLoader(
-    #         val_dataset,
-    #         batch_size=BATCH_SIZE,
-    #         shuffle=False,
-    #         num_workers=NUM_WORKERS,
-    #         pin_memory=True
-    #     )
+            testset, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers,
+            worker_init_fn=seed_worker, generator=generator)
     else:
         raise NotImplementedError
     if log == True:

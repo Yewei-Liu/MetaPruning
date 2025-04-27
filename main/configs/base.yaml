@@ -24,12 +24,13 @@ defaults:
 
 __recursive_: True
 
-name: Monet
+name: Paris
 level: 0
-run: meta_train
+run: visualize
 method: 'group_sl'
 log: True
 reproduce_index: 1
+seed: 7
 
 # no need to change
 index: 'train' 
