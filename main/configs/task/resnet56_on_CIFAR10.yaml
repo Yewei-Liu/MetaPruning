@@ -1,0 +1,92 @@
+_recursive_: True 
+
+model_name: resnet56
+task_name: ${task.model_name}_on_${task.dataset.dataset_name}
+
+dataset:
+  dataset_name: CIFAR10
+  num_workers: 4
+  big_batch: 500
+  small_batch: 128
+  dataset_path: ../dataset/${task.dataset.dataset_name}
+big_batch_dataset:
+  dataset_name: ${task.dataset.dataset_name}
+  batch_size: ${task.dataset.big_batch}
+  num_workers: ${task.dataset.num_workers}
+  dataset_path: ${task.dataset.dataset_path}
+small_batch_dataset:
+  dataset_name: ${task.dataset.dataset_name}
+  batch_size: ${task.dataset.small_batch}
+  num_workers: ${task.dataset.num_workers}
+  dataset_path: ${task.dataset.dataset_path}
+
+dataset_model:
+  dataset_model_name: resnet56_on_CIFAR10
+  train_split: 0.8
+  dataset_model_path: ../dataset_model/${task.dataset_model.dataset_model_name}_level_${level}
+  # val_split = 1 - train_split
+
+meta_train:
+  epochs: 60
+  lr : 0.001 
+  lr_decay_milestones : "12"
+  lr_decay_gamma : 0.1
+  weight_decay : 5e-4
+  method : ${method}
+  pruner_reg : [10, 10]
+  save_every_epoch : 1
+  warm_up : 0
+  level: ${level}
+  model_name : ${task.model_name}
+  dataset_name : ${task.dataset.dataset_name}
+  save_path: 'save/metanetwork/${task.dataset_model.dataset_model_name}/${name}/level_${level}/'
+  use_meta_eval: False
+  # Following are only used when use_meta_eval is True
+  meta_eval:
+    # For adaptive pruning and finetuning
+    speed_up_threshold : 0.925
+    epochs: ${task.pruning.finetune.after_metanetwork.epochs}
+    lr: ${task.pruning.finetune.after_metanetwork.lr}
+    lr_decay_milestones: ${task.pruning.finetune.after_metanetwork.lr_decay_milestones}
+    lr_decay_gamma: ${task.pruning.finetune.after_metanetwork.lr_decay_gamma}
+    weight_decay: ${task.pruning.finetune.after_metanetwork.weight_decay}
+
+metanetwork:
+  '0':
+    _target_: nn.GNN.MyGNN
+    _recursive_: True
+    num_layer: 8
+    hiddim: 64
+    in_node_dim: 8
+    in_edge_dim: 9
+    node_res_ratio: 0.01
+    edge_res_ratio: 0.01
+
+visualize:
+  max_speed_up: 5.0
+  marker: 'o'
+  save_path: 'save/visualize/${task.dataset_model.dataset_model_name}/${name}/level_${level}/'
+  ylim: [0.0, 1.0]
+
+pruning:
+  pruning_index: 2.86
+  level: ${level}
+  method: ${method}
+  finetune:
+    after_pruning:
+      epochs: 140
+      lr: 0.01
+      lr_decay_milestones: "80,120"
+      lr_decay_gamma: 0.1
+      weight_decay: 0.0005
+    after_metanetwork:
+      epochs: 100
+      lr: 0.01
+      lr_decay_milestones: "60,90"
+      lr_decay_gamma: 0.1
+      weight_decay: 0.0005
+
+
+
+    
+

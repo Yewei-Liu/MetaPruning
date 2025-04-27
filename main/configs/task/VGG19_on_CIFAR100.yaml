@@ -1,0 +1,101 @@
+_recursive_: True 
+
+model_name: VGG19
+task_name: ${task.model_name}_on_${task.dataset.dataset_name}
+
+big_batch_dataset:
+  dataset_name: CIFAR100
+  big_batch_size: 500
+  small_batch: 128
+  num_workers: 4
+  dataset_path: ../dataset/${task.dataset.dataset_name}
+big_batch_dataset:
+  dataset_name: ${task.dataset.dataset_name}
+  batch_size: ${task.dataset.big_batch}
+  num_workers: ${task.dataset.num_workers}
+  dataset_path: ${task.dataset.dataset_path}
+small_batch_dataset:
+  dataset_name: ${task.dataset.dataset_name}
+  batch_size: ${task.dataset.small_batch}
+  num_workers: ${task.dataset.num_workers}
+  dataset_path: ${task.dataset.dataset_path}
+
+dataset_model:
+  dataset_model_name: VGG19_on_CIFAR100
+  train_split: 0.5
+  val_split: 0.3
+  dataset_model_path: ../dataset_model/${task.dataset_model.dataset_model_name}_level_${level}
+  # test_split = 1 - train_split - val_split
+
+meta_train:
+  epochs: 1000
+  lr : 0.001 
+  lr_decay_milestones : "12"
+  lr_decay_gamma : 0.1
+  weight_decay : 0 # ?????
+  method : ${method}
+  pruner_reg : [10, 10]
+  save_every_epoch : 1
+  warm_up : 0
+  level: ${level}
+  model_name : ${task.model_name}
+  dataset_name : ${task.dataset.dataset_name}
+  save_path: 'save/metanetwork/${task.dataset_model.dataset_model_name}/${name}/level_${level}/'
+  use_meta_eval: False
+  # Following are only used when use_meta_eval is True
+  meta_eval:
+    # For adaptive pruning and finetuning
+    speed_up_threshold : 0.68
+    epochs: 300
+    lr : 0.01 
+    lr_decay_milestones : "150, 250"
+    lr_decay_gamma : 0.1
+    weight_decay : 0.0005
+
+
+# level >= 1
+metanetwork:
+  '0':
+    _target_: nn.GNN.MyGNN
+    num_layer: 4
+    hiddim: 16
+    in_node_dim: 5
+    in_edge_dim: 9
+    node_res_ratio: 0.01
+    edge_res_ratio: 0.01
+  '1':
+    _target_: nn.GNN.MyGNN
+    num_layer: 8
+    hiddim: 32
+    in_node_dim: 5
+    in_edge_dim: 9
+    node_res_ratio: 0.01
+    edge_res_ratio: 0.01
+
+visualize:
+  max_speed_up: 10.0
+  marker: 'o'
+  save_path: 'save/visualize/${task.dataset_model.dataset_model_name}/${name}/level_${level}/'
+  ylim: [0.0, 1.0]
+
+pruning:
+  pruning_index: [2.2, 1.6]
+  level: ${level}
+  method: ${method}
+  finetune:
+    after_pruning:
+      epochs: 300
+      lr: 0.01
+      lr_decay_milestones: "150, 250"
+      lr_decay_gamma: 0.1
+      weight_decay: 0.0005
+    after_metanetwork:
+      epochs: 300
+      lr: 0.01
+      lr_decay_milestones: "150, 250"
+      lr_decay_gamma: 0.1
+      weight_decay: 0.0005
+
+    
+
+  

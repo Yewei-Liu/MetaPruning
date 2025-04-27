@@ -1,0 +1,39 @@
+# defaults:
+#   - task: VGG19_on_CIFAR100
+#   - _self_
+
+# __recursive_: True
+
+# name: E
+# level: 1
+# run: pruning_one_step
+# method: 'group_sl'
+# log: True
+
+# # no need to change
+# index: 'train' 
+
+# hydra:
+#   run:
+#     dir: ./outputs/${task.task_name}/${name}/level_${level}/${run}/${index}
+
+
+defaults:
+  - task: resnet56_on_CIFAR10
+  - _self_
+
+__recursive_: True
+
+name: Monet
+level: 0
+run: meta_train
+method: 'group_sl'
+log: True
+reproduce_index: 1
+
+# no need to change
+index: 'train' 
+
+hydra:
+  run:
+    dir: ./outputs/${task.task_name}/${name}/level_${level}/${run}/${index}/${now:%Y-%m-%d_%H-%M-%S}

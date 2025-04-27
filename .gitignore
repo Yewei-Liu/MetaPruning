@@ -1,0 +1,10 @@
+dataset/** 
+dataset_model/**
+generate_dataset/metanetwork/**
+generate_dataset/.cache/**
+main/final/**
+main/History/**
+main/outputs/**
+main/save/**
+main/*.txt
+

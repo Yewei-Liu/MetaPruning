@@ -1,0 +1,11 @@
+model_name: VGG19
+dataset_name: CIFAR100
+big_batch_size: 500
+small_batch_size: 128
+num_workers: 4
+target: generate_dataset.VGG_generator.VGG19_on_CIFAR100_generator
+cfg:
+  speed_up: [2.2]
+  method: ${method}
+  model_name: ${data_generator.model_name}
+  dataset_name: ${data_generator.dataset_name}
