@@ -33,7 +33,7 @@ dataset_model:
 meta_train:
   epochs: 100
   lr : 0.001 
-  lr_decay_milestones : "5"
+  lr_decay_milestones : "2"
   lr_decay_gamma : 0.1
   weight_decay : 5e-4
   method : ${method}
@@ -60,7 +60,7 @@ metanetwork:
     _target_: nn.GNN.MyGNN
     _recursive_: True
     num_layer: 8
-    hiddim: 64
+    hiddim: 128 # 64
     in_node_dim: 8
     in_edge_dim: 9
     node_res_ratio: 0.01

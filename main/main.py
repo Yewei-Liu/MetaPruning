@@ -19,6 +19,7 @@ from torch.func import functional_call
 import torchvision
 import torch_pruning as tp
 from torch.utils.tensorboard import SummaryWriter
+from generate_dataset.resnet_deep_family import resnet50
 
 from datasets import Dataset
 from utils.logging import get_logger
@@ -204,15 +205,15 @@ def main(cfg):
             torch.save(model, os.path.join(reproduce_dir, 'model.pth'))
             
     elif run == 'test':
-        model = torch.load(os.path.join(reproduce_dir, 'model.pth'))
-        model.eval().to(device)
-        for param in model.parameters():
-            param = torch.zeros_like(param)    
-        example_inputs = torch.zeros((1, 3, 32, 32)).to(device)
-        base_ops, base_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
-        print(base_ops, base_params)
-
-    
+        model = resnet50(1000)
+        model_name = 'resnet50'
+        node_index, node_features, edge_index, edge_features = state_dict_to_graph(model_name, model.state_dict())
+        new_model = graph_to_model(model_name, model.state_dict(), node_index, node_features, edge_index, edge_features, device)
+        error = 0
+        for key in new_model.state_dict().keys():
+            error = ((model.state_dict()[key] - new_model.state_dict()[key])**2).sum()
+            print(key, error)
+      
 
 if __name__ == "__main__":
     main()

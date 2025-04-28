@@ -1,0 +1,2 @@
+python main.py task=resnet56_on_CIFAR10 name=Final level=0 run=pruning_final reproduce_index={} seed=7 index=2.3
+python main.py task=resnet56_on_CIFAR10 name=Final level=0 run=pruning_final reproduce_index={} seed=7 index=2.9

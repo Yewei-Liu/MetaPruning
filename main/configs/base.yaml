@@ -26,10 +26,10 @@ __recursive_: True
 
 name: Paris
 level: 0
-run: visualize
+run: meta_train
 method: 'group_sl'
 log: True
-reproduce_index: 1
+reproduce_index: 21
 seed: 7
 
 # no need to change

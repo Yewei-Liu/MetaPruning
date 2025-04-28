@@ -4,6 +4,7 @@ from torch_geometric.utils.undirected import to_undirected
 from copy import deepcopy
 from generate_dataset.resnet_family import MyResNet
 from generate_dataset.VGG_family import MyVGG
+from generate_dataset.resnet_deep_family import MyResNetDeep
 
 
 
@@ -12,6 +13,8 @@ def state_dict_to_graph(model_name, state_dict):
         return resnet56_state_dict_to_graph(state_dict)
     elif model_name == 'VGG19':
         return VGG19_state_dict_to_graph(state_dict)
+    elif model_name == 'resnet50':
+        return resnet50_state_dict_to_graph(state_dict)
     else:
         raise ValueError(f"Model {model_name} not supported.")
 
@@ -20,6 +23,8 @@ def graph_to_state_dict(model_name, state_dict, node_index, node_features, edge_
         return resnet56_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
     elif model_name == 'VGG19':
         return VGG19_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
+    elif model_name == 'resnet50':
+        return resnet50_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
     else:
         raise ValueError(f"Model {model_name} not supported.")
 
@@ -28,6 +33,8 @@ def state_dict_to_model(model_name, state_dict):
         return resnet56_state_dict_to_model(state_dict)
     elif model_name == 'VGG19':
         return VGG19_state_dict_to_model(state_dict)
+    elif model_name == 'resnet50':
+        return resnet50_state_dict_to_model(state_dict)
     else:
         raise ValueError(f"Model {model_name} not supported.")
 
@@ -201,7 +208,7 @@ def resnet50_state_dict_to_graph(state_dict):
     # [3 * 3 weight]   
 
     t = 0
-    res = 1
+    res = 0
     # down sample : 126 240 
     # end: 342
     new_node_features = None
@@ -209,10 +216,10 @@ def resnet50_state_dict_to_graph(state_dict):
     for key, val in state_dict.items():
         if not isinstance(val, torch.Tensor):
             val = torch.tensor(val)
-        if t >= 126 and t < 132 or t >= 240 and t < 246:
-            # Shortcut
+        if (t >= 24 and t < 30) or (t >= 84 and t < 90) or (t >= 162 and t < 168) or (t >= 276 and t < 282):
+            # Shortcut with weights
             if t % 6 == 0:
-                edge_index = torch.concatenate([edge_index, torch.cartesian_prod(torch.tensor(range(node_index[-4], node_index[-3])), torch.tensor(range(node_index[-2], node_index[-1])))])
+                edge_index = torch.concatenate([edge_index, torch.cartesian_prod(torch.tensor(range(node_index[-5], node_index[-4])), torch.tensor(range(node_index[-2], node_index[-1])))])
                 new_edge_features = F.pad(val, pad=[1, 1, 1, 1]).reshape(-1, 9)
                 edge_features = torch.concatenate([edge_features, new_edge_features])
             elif t % 6 == 1:
@@ -223,16 +230,16 @@ def resnet50_state_dict_to_graph(state_dict):
                 node_features[node_index[-2]: node_index[-1]][:, 6] = val
             elif t % 6 == 4:
                 node_features[node_index[-2]: node_index[-1]][:, 7] = val
-        elif t >=  342:
+        elif t >=  318:
             # End
-            if t == 342:
+            if t == 318:
                 node_index.append(node_index[-1] + len(val))
                 edge_index = torch.concatenate([edge_index, torch.cartesian_prod(torch.tensor(range(node_index[-3], node_index[-2])), torch.tensor(range(node_index[-2], node_index[-1])))])
                 tmp = val.T
                 tmp = tmp.reshape(tmp.shape[0], tmp.shape[1], 1, 1)
                 edge_features = torch.concatenate([edge_features, F.pad(tmp, pad=[1, 1, 1, 1]).reshape(-1, 9)])
                 new_node_features = torch.tile(torch.tensor([1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]), (len(val), 1))
-            elif t == 343:
+            elif t == 319:
                 new_node_features[:, 1] = val
                 node_features = torch.concatenate([node_features, new_node_features])
             else:
@@ -250,12 +257,12 @@ def resnet50_state_dict_to_graph(state_dict):
             else:
                 edge_features = val.reshape(-1, 9)
             new_node_features = torch.tile(torch.tensor([1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]), (len(val), 1))
+            # short cut without weights
             if t != 0:
-                res ^= 1
-                x = node_index[-3] - node_index[-4]
-                y = node_index[-1] - node_index[-2]
-                if res == 1 and x == y:
-                    edge_index = torch.concatenate([edge_index, torch.cartesian_prod(torch.tensor(range(node_index[-4], node_index[-3])), torch.tensor(range(node_index[-2], node_index[-1])))])
+                res = (res + 1) % 3
+                if len(node_index) >= 5 and res == 0 and node_index[-4] - node_index[-5] == node_index[-1] - node_index[-2]:
+                    x = y = node_index[-4] - node_index[-5]
+                    edge_index = torch.concatenate([edge_index, torch.cartesian_prod(torch.tensor(range(node_index[-5], node_index[-4])), torch.tensor(range(node_index[-2], node_index[-1])))])
                     new_edge_features = torch.zeros((x, y, 9)).to(edge_features.device)
                     for i in range(x):
                         new_edge_features[i][i][4] = 1.0
@@ -290,32 +297,35 @@ def resnet50_graph_to_state_dict(
     state_dict['bn1.weight'] = node_features[node_index[1]: node_index[2]][:, 0]
     state_dict['bn1.bias'] = node_features[node_index[1]: node_index[2]][:, 1]
     t = 6
-    res = 1
+    res = 0
     edge_idx = node_num[0] * node_num[1]
     node_idx = 1
     for key in list(state_dict.keys())[6: -3]:
-        if t >= 126 and t < 132 or t >= 240 and t < 246:
+        if (t >= 24 and t < 30) or (t >= 84 and t < 90) or (t >= 162 and t < 168) or (t >= 276 and t < 282):
             if t % 6 == 0:
-                state_dict[key] = edge_features[edge_idx - node_num[node_idx] * node_num[node_idx - 2]: edge_idx].reshape(node_num[node_idx], node_num[node_idx - 2], 3, 3)[:, :, 1:2, 1:2]
+                state_dict[key] = edge_features[edge_idx - node_num[node_idx] * node_num[node_idx - 3]: edge_idx].reshape(node_num[node_idx], node_num[node_idx - 3], 3, 3)[:, :, 1:2, 1:2]
             elif t % 6 == 1:
                 state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 4]
             elif t % 6 == 2:
                 state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 5]
         elif t % 6 == 0:
-            state_dict[key] = edge_features[edge_idx: edge_idx + node_num[node_idx] * node_num[node_idx + 1]].reshape(node_num[node_idx + 1], node_num[node_idx], 3, 3)
+            res = (res + 1) % 3
+            if res == 1 or res == 0:
+                state_dict[key] = edge_features[edge_idx: edge_idx + node_num[node_idx] * node_num[node_idx + 1]].reshape(node_num[node_idx + 1], node_num[node_idx], 3, 3)[:, :, 1:2, 1:2]
+            else:
+                state_dict[key] = edge_features[edge_idx: edge_idx + node_num[node_idx] * node_num[node_idx + 1]].reshape(node_num[node_idx + 1], node_num[node_idx], 3, 3)
             edge_idx += node_num[node_idx] * node_num[node_idx + 1]
             node_idx += 1
-            res ^= 1
-            if res == 1:
-                edge_idx += node_num[node_idx - 2] * node_num[node_idx]
+            if res == 0:
+                edge_idx += node_num[node_idx - 3] * node_num[node_idx]
         elif t % 6 == 1:
             state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 0]
         elif t % 6 == 2:
             state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 1]
         t += 1
     edge_idx += node_num[-1] * node_num[-2]
-    state_dict['fc.weight'] = edge_features[-node_num[-1] * node_num[-2]:].reshape(node_num[-2], node_num[-1], 3, 3)[:, :, 1, 1].T
-    state_dict['fc.bias'] = node_features[node_index[-2]: node_index[-1]][:, 1]
+    state_dict['linear.weight'] = edge_features[-node_num[-1] * node_num[-2]:].reshape(node_num[-2], node_num[-1], 3, 3)[:, :, 1, 1].T
+    state_dict['linear.bias'] = node_features[node_index[-2]: node_index[-1]][:, 1]
     for key, val in state_dict.items():
         state_dict[key] = val.to(device)
     return state_dict
@@ -324,10 +334,10 @@ def resnet50_state_dict_to_model(state_dict):
     node_index = [0, 3]
     t = 0
     for key, val in state_dict.items():
-        if t >= 126 and t < 132 or t >= 240 and t < 246:
+        if (t >= 24 and t < 30) or (t >= 84 and t < 90) or (t >= 162 and t < 168) or (t >= 276 and t < 282):
             pass
-        elif t >=  342:
-            if t == 342:
+        elif t >=  318:
+            if t == 318:
                 node_index.append(node_index[-1] + len(val))
             else:
                 break
@@ -335,7 +345,7 @@ def resnet50_state_dict_to_model(state_dict):
             node_index.append(node_index[-1] + len(val))
         t += 1
     node_num = [node_index[i + 1] - node_index[i] for i in range(len(node_index) - 1)]
-    res = MyResNet(56, node_num, 10)
+    res = MyResNetDeep(node_num)
     res.load_state_dict(state_dict)
     return res
 
