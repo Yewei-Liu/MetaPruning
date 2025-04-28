@@ -12,14 +12,16 @@ from utils.convert import state_dict_to_graph, graph_to_model
 import os
 
 
-def VGG19_on_CIFAR100_generator(num, level, method, cfg, cfg_dataset):
-    train_loader, test_loader = get_dataset_loader(cfg_dataset)
+def VGG19_on_CIFAR100_generator(level, method, num, cfg, cfg_big_dataset, cfg_small_dataset):
+    big_train_loader, big_test_loader = get_dataset_loader(cfg_big_dataset)
+    small_train_loader, small_test_loader = get_dataset_loader(cfg_small_dataset)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     metanetwork_dir = os.path.join('metanetwork', f'{cfg.model_name}_on_{cfg.dataset_name}')
+    log = True
     def one_generate_step():
         current_speed_up = 1.0
         model = vgg19_bn(num_classes=100)
-        train_acc, train_loss, val_acc, val_loss = train(model, train_loader, test_loader, 300, 0.1, "150, 250")
+        train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 200, 0.1, "100,150,180", log=log)
         if level == 0:
             data = model.eval().cpu().state_dict()
             data['train_acc'] = train_acc
@@ -34,10 +36,10 @@ def VGG19_on_CIFAR100_generator(num, level, method, cfg, cfg_dataset):
             node_index, node_features, edge_index, edge_features = state_dict_to_graph(cfg.model_name, model.state_dict())
             node_pred, edge_pred = metanetwork.forward(node_features.to(device), edge_index.to(device), edge_features.to(device))
             model = graph_to_model(cfg.model_name, model.state_dict(), node_index, node_pred, edge_index, edge_pred)
-            train_acc, train_loss, val_acc, val_loss = train(model, train_loader, test_loader, 300, 0.01, "150, 250", return_best=True)
-            speed_up, model = progressive_pruning(model, cfg_dataset.dataset_name, train_loader, test_loader, cfg.speed_up[j], method=method)
+            train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 100, 0.01, "60, 80", return_best=True, log=log)
+            speed_up, model = progressive_pruning(model, cfg.dataset_name, big_train_loader, big_test_loader, cfg.speed_up[j], method=method, log=log)
             current_speed_up *= speed_up
-            train_acc, train_loss, val_acc, val_loss = train(model, train_loader, test_loader, 300, 0.01, "150, 250", return_best=True) 
+            train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 140, 0.01, "80, 120", return_best=True, log=log) 
             if j == level - 1:
                 data = model.eval().cpu().state_dict()
                 data['train_acc'] = train_acc

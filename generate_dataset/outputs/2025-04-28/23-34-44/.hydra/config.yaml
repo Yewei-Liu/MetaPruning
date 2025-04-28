@@ -1,36 +1,38 @@
-defaults:
-  - data_generator: VGG19_on_CIFAR100
-  - _self_
-
-_recursive_: True 
-
+data_generator:
+  model_name: VGG19
+  dataset_name: CIFAR100
+  big_batch_size: 500
+  small_batch_size: 128
+  num_workers: 4
+  target: generate_dataset.VGG_generator.VGG19_on_CIFAR100_generator
+  cfg:
+    speed_up:
+    - 2.2
+    method: ${method}
+    model_name: ${data_generator.model_name}
+    dataset_name: ${data_generator.dataset_name}
+_recursive_: true
 level: 0
-index: 1  # unique index for parrallel generation and merge
-num: 5 # number of generated data points
+index: 1
+num: 5
 num_proc: 1
-method: 'group_sl'
-
-
-# Follows are defaults, no need to change.
-
+method: group_sl
 name: ${data_generator.model_name}_on_${data_generator.dataset_name}
 model_name: ${data_generator.model_name}
 dataset_name: ${data_generator.dataset_name}
-save_path: ../dataset_model/${name}_level_${level}_${index}   # path to save the generated dataset
-dataset_path: ../dataset/${data_generator.dataset_name}     # path to CIFAR10 for example
+save_path: ../dataset_model/${name}_level_${level}_${index}
+dataset_path: ../dataset/${data_generator.dataset_name}
 cache_path: .cache/${index}
-
 generator:
   _target_: ${data_generator.target}
-  _recursive_: True 
-  _partial_: True  
+  _recursive_: true
+  _partial_: true
   level: ${level}
   method: ${method}
   num: ${num}
   cfg: ${data_generator.cfg}
   cfg_big_dataset: ${big_batch_dataset}
   cfg_small_dataset: ${small_batch_dataset}
-
 dataset:
   dataset_name: ${data_generator.dataset_name}
   num_workers: ${data_generator.num_workers}
