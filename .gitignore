@@ -7,4 +7,7 @@ main/History/**
 main/outputs/**
 main/save/**
 main/*.txt
+main_imagenet/*.txt
+main_imagenet/outputs/**
+main_imagenet/save/**
 

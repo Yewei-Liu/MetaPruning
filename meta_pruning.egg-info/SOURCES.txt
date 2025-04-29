@@ -11,7 +11,6 @@ generate_dataset/__init__.py
 generate_dataset/generate.py
 generate_dataset/merge_dataset.py
 generate_dataset/resnet_deep_family.py
-generate_dataset/resnet_deep_generator.py
 generate_dataset/resnet_family.py
 generate_dataset/resnet_generator.py
 main/__init__.py
@@ -29,6 +28,7 @@ utils/logging.py
 utils/meta_train.py
 utils/pruner.py
 utils/pruning.py
+utils/seed.py
 utils/train.py
 utils/visualize.py
 utils/imagenet_utils/__init__.py

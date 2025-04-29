@@ -1,0 +1,83 @@
+_recursive_: True
+
+name: Ame
+run: train
+
+data_path: "../../imagenet"
+model: "resnet50"
+pretrained: False
+
+
+device: "cuda"
+batch_size: 256
+epochs: 90
+workers: 16
+opt: "sgd"
+lr: 0.1
+momentum: 0.9
+weight_decay: 0.0001
+norm_weight_decay: null
+bias_weight_decay: null
+transformer_embedding_decay: null
+label_smoothing: 0.0
+mixup_alpha: 0.0
+cutmix_alpha: 0.0
+lr_scheduler: "steplr"
+lr_warmup_epochs: 0
+lr_warmup_method: "constant"
+lr_warmup_decay: 0.01
+lr_step_size: 30
+lr_gamma: 0.1
+lr_min: 0.0
+print_freq: 100
+output_dir: "save/${name}/${run}/${now:%Y-%m-%d_%H-%M-%S}"
+resume: ""
+start_epoch: 0
+cache_dataset: True
+sync_bn: False
+auto_augment: null
+ra_magnitude: 9
+augmix_severity: 3
+random_erase: 0.0
+
+
+amp: True
+
+distributed: False
+world_size: 0
+rank: 0
+gpu: 0
+dist_backend: None
+dist_url: "env://"
+model_ema: False
+model_ema_steps: 32
+model_ema_decay: 0.99998
+use_deterministic_algorithms: False
+interpolation: "bilinear"
+val_resize_size: 256
+val_crop_size: 224
+train_crop_size: 224
+clip_grad_norm: null
+ra_sampler: False
+ra_reps: 3
+weights: null
+
+# Pruning parameters
+method: "group_sl"
+global_pruning: True
+target_flops: 2.0
+soft_keeping_ratio: 0.0
+reg: 0.0001
+delta_reg: 0.0001
+max_pruning_ratio: 1.0
+sl_epochs: null
+sl_resume: null
+sl_lr: null
+sl_lr_step_size: null
+sl_lr_warmup_epochs: null
+
+
+
+hydra:
+  run:
+    dir: ./outputs/${name}/${run}/${now:%Y-%m-%d_%H-%M-%S}
