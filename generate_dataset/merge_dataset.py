@@ -14,7 +14,7 @@ def main(cfg):
 
     # for example, if you want to merge resnet56_on_CIFAR10_0, resnet56_on_CIFAR10_1, resnet56_on_CIFAR10_2
     # you should set num to 3
-    num = 4
+    num = int(input("Please enter the number of datasets to merge: "))
     datasets = []
     for i in range(num):
         datasets.append(load_from_disk(os.path.join(path_prefix, f"{dataset_name}_level_{level}_{i}")))

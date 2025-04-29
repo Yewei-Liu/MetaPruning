@@ -140,7 +140,7 @@ hydra:
     - path: ''
       schema: structured
       provider: schema
-    output_dir: /home/liuyewei/metanetwork/meta-pruning/generate_dataset/outputs/2025-04-28/23-33-00
+    output_dir: /home/liuyewei/metanetwork/meta-pruning/generate_dataset/outputs/2025-04-29/23-28-18
     choices:
       data_generator: VGG19_on_CIFAR100
       hydra/env: default

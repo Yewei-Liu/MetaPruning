@@ -52,10 +52,6 @@ small_batch_dataset:
   num_workers: ${dataset.num_workers}
   dataset_path: ${dataset.dataset_path}
 
-Generating train split: 0 examples [00:00, ? examples/s]Files already downloaded and verified
-Files already downloaded and verified
-Files already downloaded and verified
-Files already downloaded and verified
 [2025-04-29 23:28:48,429][train][INFO] - Before training : Train Acc=0.0100  Val Acc=0.0100
 [2025-04-29 23:28:56,494][train][INFO] - Epoch 1/200, Val Acc=0.0709, Val Loss=4.1108, lr=0.1000
 [2025-04-29 23:29:04,777][train][INFO] - Epoch 2/200, Val Acc=0.1299, Val Loss=3.6331, lr=0.1000

@@ -3,36 +3,39 @@ _recursive_: True
 model_name: VGG19
 task_name: ${task.model_name}_on_${task.dataset.dataset_name}
 
-big_batch_dataset:
+dataset:
   dataset_name: CIFAR100
-  big_batch_size: 500
-  small_batch: 128
   num_workers: 4
+  big_batch: 500
+  small_batch: 128
   dataset_path: ../dataset/${task.dataset.dataset_name}
+  seed: ${seed}
 big_batch_dataset:
   dataset_name: ${task.dataset.dataset_name}
   batch_size: ${task.dataset.big_batch}
   num_workers: ${task.dataset.num_workers}
   dataset_path: ${task.dataset.dataset_path}
+  seed: ${seed}
 small_batch_dataset:
   dataset_name: ${task.dataset.dataset_name}
   batch_size: ${task.dataset.small_batch}
   num_workers: ${task.dataset.num_workers}
   dataset_path: ${task.dataset.dataset_path}
+  seed: ${seed}
 
 dataset_model:
   dataset_model_name: VGG19_on_CIFAR100
-  train_split: 0.5
-  val_split: 0.3
+  train_split: 0.8
   dataset_model_path: ../dataset_model/${task.dataset_model.dataset_model_name}_level_${level}
-  # test_split = 1 - train_split - val_split
+  seed: ${seed}
+  # val_split = 1 - train_split
 
 meta_train:
-  epochs: 1000
+  epochs: 100
   lr : 0.001 
-  lr_decay_milestones : "12"
+  lr_decay_milestones : "10"
   lr_decay_gamma : 0.1
-  weight_decay : 0 # ?????
+  weight_decay : 5e-4
   method : ${method}
   pruner_reg : [10, 10]
   save_every_epoch : 1
@@ -46,17 +49,18 @@ meta_train:
   meta_eval:
     # For adaptive pruning and finetuning
     speed_up_threshold : 0.68
-    epochs: 300
-    lr : 0.01 
-    lr_decay_milestones : "150, 250"
-    lr_decay_gamma : 0.1
-    weight_decay : 0.0005
+    epochs: ${task.pruning.finetune.after_metanetwork.epochs}
+    lr: ${task.pruning.finetune.after_metanetwork.lr}
+    lr_decay_milestones: ${task.pruning.finetune.after_metanetwork.lr_decay_milestones}
+    lr_decay_gamma: ${task.pruning.finetune.after_metanetwork.lr_decay_gamma}
+    weight_decay: ${task.pruning.finetune.after_metanetwork.weight_decay}
 
 
 # level >= 1
 metanetwork:
   '0':
     _target_: nn.GNN.MyGNN
+    _recursive_: True
     num_layer: 4
     hiddim: 16
     in_node_dim: 5
@@ -65,15 +69,16 @@ metanetwork:
     edge_res_ratio: 0.01
   '1':
     _target_: nn.GNN.MyGNN
+    _recursive_: True
     num_layer: 8
-    hiddim: 32
+    hiddim: 64
     in_node_dim: 5
     in_edge_dim: 9
     node_res_ratio: 0.01
     edge_res_ratio: 0.01
 
 visualize:
-  max_speed_up: 10.0
+  max_speed_up: 5.0
   marker: 'o'
   save_path: 'save/visualize/${task.dataset_model.dataset_model_name}/${name}/level_${level}/'
   ylim: [0.0, 1.0]
@@ -84,15 +89,15 @@ pruning:
   method: ${method}
   finetune:
     after_pruning:
-      epochs: 300
+      epochs: 140
       lr: 0.01
-      lr_decay_milestones: "150, 250"
+      lr_decay_milestones: "80,120"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
     after_metanetwork:
-      epochs: 300
+      epochs: 100
       lr: 0.01
-      lr_decay_milestones: "150, 250"
+      lr_decay_milestones: "60,90"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
 
