@@ -241,27 +241,27 @@ def train(
     epochs, 
     lr, lr_step_size, lr_warmup_epochs, 
     train_sampler, data_loader, data_loader_test, 
-    device, args, pruner=None, state_dict_only=True, recover=None):
+    device, cfg, pruner=None, state_dict_only=True, recover=None):
 
     model.to(device)
-    if args.distributed and args.sync_bn:
+    if cfg.distributed and cfg.sync_bn:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
-    if args.label_smoothing>0:
-        criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
+    if cfg.label_smoothing>0:
+        criterion = nn.CrossEntropyLoss(label_smoothing=cfg.label_smoothing)
     else:
         criterion = nn.CrossEntropyLoss()
 
-    weight_decay = args.weight_decay if pruner is None else 0
-    bias_weight_decay = args.bias_weight_decay if pruner is None else 0
-    norm_weight_decay = args.norm_weight_decay if pruner is None else 0
+    weight_decay = cfg.weight_decay if pruner is None else 0
+    bias_weight_decay = cfg.bias_weight_decay if pruner is None else 0
+    norm_weight_decay = cfg.norm_weight_decay if pruner is None else 0
 
     custom_keys_weight_decay = []
     if bias_weight_decay is not None:
         custom_keys_weight_decay.append(("bias", bias_weight_decay))
-    if args.transformer_embedding_decay is not None:
+    if cfg.transformer_embedding_decay is not None:
         for key in ["class_token", "position_embedding", "relative_position_bias_table"]:
-            custom_keys_weight_decay.append((key, args.transformer_embedding_decay))
+            custom_keys_weight_decay.append((key, cfg.transformer_embedding_decay))
     parameters = utils.set_weight_decay(
         model,
         weight_decay,
@@ -269,54 +269,54 @@ def train(
         custom_keys_weight_decay=custom_keys_weight_decay if len(custom_keys_weight_decay) > 0 else None,
     )
 
-    opt_name = args.opt.lower()
+    opt_name = cfg.opt.lower()
     if opt_name.startswith("sgd"):
         optimizer = torch.optim.SGD(
             parameters,
             lr=lr,
-            momentum=args.momentum,
+            momentum=cfg.momentum,
             weight_decay=weight_decay,
             nesterov="nesterov" in opt_name,
         )
     elif opt_name == "rmsprop":
         optimizer = torch.optim.RMSprop(
-            parameters, lr=lr, momentum=args.momentum, weight_decay=weight_decay, eps=0.0316, alpha=0.9
+            parameters, lr=lr, momentum=cfg.momentum, weight_decay=weight_decay, eps=0.0316, alpha=0.9
         )
     elif opt_name == "adamw":
         optimizer = torch.optim.AdamW(parameters, lr=lr, weight_decay=weight_decay)
     else:
-        raise RuntimeError(f"Invalid optimizer {args.opt}. Only SGD, RMSprop and AdamW are supported.")
+        raise RuntimeError(f"Invalid optimizer {cfg.opt}. Only SGD, RMSprop and AdamW are supported.")
 
     # scaler = torch.cuda.amp.GradScaler() if args.amp else None
-    scaler = torch.amp.GradScaler("cuda") if args.amp else None
+    scaler = torch.amp.GradScaler("cuda") if cfg.amp else None
 
-    args.lr_scheduler = args.lr_scheduler.lower()
-    if args.lr_scheduler == "steplr":
-        main_lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size, gamma=args.lr_gamma)
-    elif args.lr_scheduler == "cosineannealinglr":
+    cfg.lr_scheduler = cfg.lr_scheduler.lower()
+    if cfg.lr_scheduler == "steplr":
+        main_lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size, gamma=cfg.lr_gamma)
+    elif cfg.lr_scheduler == "cosineannealinglr":
         main_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=epochs - lr_warmup_epochs, eta_min=args.lr_min
+            optimizer, T_max=epochs - lr_warmup_epochs, eta_min=cfg.lr_min
         )
-    elif args.lr_scheduler == "exponentiallr":
-        main_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=args.lr_gamma)
+    elif cfg.lr_scheduler == "exponentiallr":
+        main_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=cfg.lr_gamma)
     else:
         raise RuntimeError(
-            f"Invalid lr scheduler '{args.lr_scheduler}'. Only StepLR, CosineAnnealingLR and ExponentialLR "
+            f"Invalid lr scheduler '{cfg.lr_scheduler}'. Only StepLR, CosineAnnealingLR and ExponentialLR "
             "are supported."
         )
 
     if lr_warmup_epochs > 0:
-        if args.lr_warmup_method == "linear":
+        if cfg.lr_warmup_method == "linear":
             warmup_lr_scheduler = torch.optim.lr_scheduler.LinearLR(
-                optimizer, start_factor=args.lr_warmup_decay, total_iters=lr_warmup_epochs
+                optimizer, start_factor=cfg.lr_warmup_decay, total_iters=lr_warmup_epochs
             )
-        elif args.lr_warmup_method == "constant":
+        elif cfg.lr_warmup_method == "constant":
             warmup_lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
-                optimizer, factor=args.lr_warmup_decay, total_iters=lr_warmup_epochs
+                optimizer, factor=cfg.lr_warmup_decay, total_iters=lr_warmup_epochs
             )
         else:
             raise RuntimeError(
-                f"Invalid warmup lr method '{args.lr_warmup_method}'. Only linear and constant are supported."
+                f"Invalid warmup lr method '{cfg.lr_warmup_method}'. Only linear and constant are supported."
             )
         lr_scheduler = torch.optim.lr_scheduler.SequentialLR(
             optimizer, schedulers=[warmup_lr_scheduler, main_lr_scheduler], milestones=[lr_warmup_epochs]
@@ -325,29 +325,29 @@ def train(
         lr_scheduler = main_lr_scheduler
 
     model_without_ddp = model
-    if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+    if cfg.distributed:
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.gpu])
         model_without_ddp = model.module
 
     model_ema = None
-    if args.model_ema:
+    if cfg.model_ema:
         # Decay adjustment that aims to keep the decay independent from other hyper-parameters originally proposed at:
         # https://github.com/facebookresearch/pycls/blob/f8cd9627/pycls/core/net.py#L123
         #
         # total_ema_updates = (Dataset_size / n_GPUs) * epochs / (batch_size_per_gpu * EMA_steps)
         # We consider constant = Dataset_size for a given dataset/setup and ommit it. Thus:
         # adjust = 1 / total_ema_updates ~= n_GPUs * batch_size_per_gpu * EMA_steps / epochs
-        adjust = args.world_size * args.batch_size * args.model_ema_steps / epochs
-        alpha = 1.0 - args.model_ema_decay
+        adjust = cfg.world_size * cfg.batch_size * cfg.model_ema_steps / epochs
+        alpha = 1.0 - cfg.model_ema_decay
         alpha = min(1.0, alpha * adjust)
         model_ema = utils.ExponentialMovingAverage(model_without_ddp, device=device, decay=1.0 - alpha)
 
-    if args.resume:
-        checkpoint = torch.load(args.resume, map_location="cpu")
+    if cfg.resume:
+        checkpoint = torch.load(cfg.resume, map_location="cpu")
         model_without_ddp.load_state_dict(checkpoint["model"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
-        args.start_epoch = checkpoint["epoch"] + 1
+        cfg.start_epoch = checkpoint["epoch"] + 1
         if model_ema:
             model_ema.load_state_dict(checkpoint["model_ema"])
         if scaler:
@@ -355,22 +355,22 @@ def train(
     
     start_time = time.time()
     best_acc = 0
-    prefix = '' if pruner is None else 'regularized_{:e}_'.format(args.reg)
-    for epoch in range(args.start_epoch, epochs):
-        if args.distributed:
+    prefix = '' if pruner is None else 'regularized_{:e}_'.format(cfg.reg)
+    for epoch in range(cfg.start_epoch, epochs):
+        if cfg.distributed:
             train_sampler.set_epoch(epoch)
-        train_one_epoch(model, criterion, optimizer, data_loader, device, epoch, args, model_ema, scaler, pruner, recover=recover)
+        train_one_epoch(model, criterion, optimizer, data_loader, device, epoch, cfg, model_ema, scaler, pruner, recover=recover)
         lr_scheduler.step()
         acc = evaluate(model, criterion, data_loader_test, device=device)
         if model_ema:
             acc = evaluate(model_ema, criterion, data_loader_test, device=device, log_suffix="EMA")
-        if args.output_dir:
+        if cfg.output_dir:
             checkpoint = {
                 "model": model_without_ddp.state_dict() if state_dict_only else model_without_ddp,
                 "optimizer": optimizer.state_dict(),
                 "lr_scheduler": lr_scheduler.state_dict(),
                 "epoch": epoch,
-                "args": args,
+                "args": cfg,
             }
             if model_ema:
                 checkpoint["model_ema"] = model_ema.state_dict()
@@ -378,13 +378,15 @@ def train(
                 checkpoint["scaler"] = scaler.state_dict()
             if acc>best_acc:
                 best_acc=acc
-                utils.save_on_master(checkpoint, os.path.join(args.output_dir, prefix+"best.pth"))
-            utils.save_on_master(checkpoint, os.path.join(args.output_dir, prefix+"latest.pth"))
+                utils.save_on_master(checkpoint, os.path.join(cfg.output_dir, prefix+"best.pth"))
+            utils.save_on_master(checkpoint, os.path.join(cfg.output_dir, prefix+"latest.pth"))
         print("Epoch {}/{}, Current Best Acc = {:.6f}".format(epoch, epochs, best_acc))
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print(f"Training time {total_time_str}")
+    if cfg.distributed:
+        torch.distributed.destroy_process_group()
     return model_without_ddp
 
 
@@ -512,7 +514,7 @@ def main(cfg: DictConfig) -> None:
             data_loader=data_loader,
             data_loader_test=data_loader_test,
             device=device,
-            args=cfg,
+            cfg=cfg,
             pruner=None,
             state_dict_only=True,
         )
