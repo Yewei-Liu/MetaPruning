@@ -11,6 +11,7 @@ pretrained: False
 
 device: "cuda"
 batch_size: 32
+big_batch_size: 250
 epochs: 90
 workers: 16
 opt: "sgd"
@@ -71,6 +72,8 @@ soft_keeping_ratio: 0.0
 reg: 0.0001
 delta_reg: 0.0001
 max_pruning_ratio: 1.0
+data_dependency: False
+sparsity_learning: False
 sl_epochs: null
 sl_resume: null
 sl_lr: null

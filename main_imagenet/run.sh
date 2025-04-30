@@ -1,12 +1,13 @@
 #!/bin/bash
 
-INDEX=1  
-RUN_TYPE="train"               
+INDEX=0  
+RUN_TYPE="visualize"               
 TARGET_FLOPS=4.0   
-NAME="Ame"
+NAME=Pretrain  # "Ame"
+PRETRAINED=True
 
 NUM_GPUS=8                     
-MASTER_PORT=29500               
+MASTER_PORT=18900             
 CONFIG_NAME="base"              
         
 
@@ -36,4 +37,5 @@ torchrun \
     target_flops=$TARGET_FLOPS \
     index=$INDEX \
     name=$NAME \
+    pretrained=$PRETRAINED \
     > "save/${NAME}/${INDEX}/${RUN_TYPE}/${INDEX}.log" &

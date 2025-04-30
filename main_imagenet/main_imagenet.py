@@ -24,6 +24,8 @@ from functools import partial
 from omegaconf import DictConfig, OmegaConf
 import hydra
 
+import matplotlib.pyplot as plt
+
 
 def prune_to_target_flops(pruner, model, target_flops, example_inputs, cfg):
     model.eval()
@@ -149,7 +151,7 @@ def train_one_epoch(
         pruner.update_reg()
 
 
-def evaluate(model, criterion, data_loader, device, print_freq=100, log_suffix=""):
+def evaluate(model, criterion, data_loader, device, print_freq=200, log_suffix=""):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = f"Test: {log_suffix}"
@@ -180,7 +182,7 @@ def evaluate(model, criterion, data_loader, device, print_freq=100, log_suffix="
 
     metric_logger.synchronize_between_processes()
     print(f"{header} Acc@1 {metric_logger.acc1.global_avg:.3f} Acc@5 {metric_logger.acc5.global_avg:.3f}")
-    return metric_logger.acc1.global_avg
+    return metric_logger.acc1.global_avg, metric_logger.acc5.global_avg
 
 
 def _get_cache_path(filepath):
@@ -236,6 +238,7 @@ def load_data(traindir, valdir, cfg):
 
     return dataset, dataset_test, train_sampler, test_sampler
 
+
 def train(
     model, 
     epochs, 
@@ -288,7 +291,7 @@ def train(
         raise RuntimeError(f"Invalid optimizer {cfg.opt}. Only SGD, RMSprop and AdamW are supported.")
 
     # scaler = torch.cuda.amp.GradScaler() if args.amp else None
-    scaler = torch.amp.GradScaler("cuda") if cfg.amp else None
+    scaler = torch.cuda.amp.GradScaler() if cfg.amp else None
 
     cfg.lr_scheduler = cfg.lr_scheduler.lower()
     if cfg.lr_scheduler == "steplr":
@@ -388,6 +391,242 @@ def train(
     if cfg.distributed:
         torch.distributed.destroy_process_group()
     return model_without_ddp
+
+
+def meta_train(
+    model, 
+    epochs, 
+    lr, lr_step_size, lr_warmup_epochs, 
+    train_sampler, data_loader, data_loader_test, 
+    device, cfg, pruner=None, state_dict_only=True, recover=None):
+
+    model.to(device)
+    if cfg.distributed and cfg.sync_bn:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+
+    if cfg.label_smoothing>0:
+        criterion = nn.CrossEntropyLoss(label_smoothing=cfg.label_smoothing)
+    else:
+        criterion = nn.CrossEntropyLoss()
+
+    weight_decay = cfg.weight_decay if pruner is None else 0
+    bias_weight_decay = cfg.bias_weight_decay if pruner is None else 0
+    norm_weight_decay = cfg.norm_weight_decay if pruner is None else 0
+
+    custom_keys_weight_decay = []
+    if bias_weight_decay is not None:
+        custom_keys_weight_decay.append(("bias", bias_weight_decay))
+    if cfg.transformer_embedding_decay is not None:
+        for key in ["class_token", "position_embedding", "relative_position_bias_table"]:
+            custom_keys_weight_decay.append((key, cfg.transformer_embedding_decay))
+    parameters = utils.set_weight_decay(
+        model,
+        weight_decay,
+        norm_weight_decay=norm_weight_decay,
+        custom_keys_weight_decay=custom_keys_weight_decay if len(custom_keys_weight_decay) > 0 else None,
+    )
+
+    opt_name = cfg.opt.lower()
+    if opt_name.startswith("sgd"):
+        optimizer = torch.optim.SGD(
+            parameters,
+            lr=lr,
+            momentum=cfg.momentum,
+            weight_decay=weight_decay,
+            nesterov="nesterov" in opt_name,
+        )
+    elif opt_name == "rmsprop":
+        optimizer = torch.optim.RMSprop(
+            parameters, lr=lr, momentum=cfg.momentum, weight_decay=weight_decay, eps=0.0316, alpha=0.9
+        )
+    elif opt_name == "adamw":
+        optimizer = torch.optim.AdamW(parameters, lr=lr, weight_decay=weight_decay)
+    else:
+        raise RuntimeError(f"Invalid optimizer {cfg.opt}. Only SGD, RMSprop and AdamW are supported.")
+
+    # scaler = torch.cuda.amp.GradScaler() if args.amp else None
+    scaler = torch.cuda.amp.GradScaler() if cfg.amp else None
+
+    cfg.lr_scheduler = cfg.lr_scheduler.lower()
+    if cfg.lr_scheduler == "steplr":
+        main_lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size, gamma=cfg.lr_gamma)
+    elif cfg.lr_scheduler == "cosineannealinglr":
+        main_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=epochs - lr_warmup_epochs, eta_min=cfg.lr_min
+        )
+    elif cfg.lr_scheduler == "exponentiallr":
+        main_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=cfg.lr_gamma)
+    else:
+        raise RuntimeError(
+            f"Invalid lr scheduler '{cfg.lr_scheduler}'. Only StepLR, CosineAnnealingLR and ExponentialLR "
+            "are supported."
+        )
+
+    if lr_warmup_epochs > 0:
+        if cfg.lr_warmup_method == "linear":
+            warmup_lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+                optimizer, start_factor=cfg.lr_warmup_decay, total_iters=lr_warmup_epochs
+            )
+        elif cfg.lr_warmup_method == "constant":
+            warmup_lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
+                optimizer, factor=cfg.lr_warmup_decay, total_iters=lr_warmup_epochs
+            )
+        else:
+            raise RuntimeError(
+                f"Invalid warmup lr method '{cfg.lr_warmup_method}'. Only linear and constant are supported."
+            )
+        lr_scheduler = torch.optim.lr_scheduler.SequentialLR(
+            optimizer, schedulers=[warmup_lr_scheduler, main_lr_scheduler], milestones=[lr_warmup_epochs]
+        )
+    else:
+        lr_scheduler = main_lr_scheduler
+
+    model_without_ddp = model
+    if cfg.distributed:
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.gpu])
+        model_without_ddp = model.module
+
+    model_ema = None
+    if cfg.model_ema:
+        # Decay adjustment that aims to keep the decay independent from other hyper-parameters originally proposed at:
+        # https://github.com/facebookresearch/pycls/blob/f8cd9627/pycls/core/net.py#L123
+        #
+        # total_ema_updates = (Dataset_size / n_GPUs) * epochs / (batch_size_per_gpu * EMA_steps)
+        # We consider constant = Dataset_size for a given dataset/setup and ommit it. Thus:
+        # adjust = 1 / total_ema_updates ~= n_GPUs * batch_size_per_gpu * EMA_steps / epochs
+        adjust = cfg.world_size * cfg.batch_size * cfg.model_ema_steps / epochs
+        alpha = 1.0 - cfg.model_ema_decay
+        alpha = min(1.0, alpha * adjust)
+        model_ema = utils.ExponentialMovingAverage(model_without_ddp, device=device, decay=1.0 - alpha)
+
+    if cfg.resume:
+        checkpoint = torch.load(cfg.resume, map_location="cpu")
+        model_without_ddp.load_state_dict(checkpoint["model"])
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+        cfg.start_epoch = checkpoint["epoch"] + 1
+        if model_ema:
+            model_ema.load_state_dict(checkpoint["model_ema"])
+        if scaler:
+            scaler.load_state_dict(checkpoint["scaler"])
+    
+    start_time = time.time()
+    best_acc = 0
+    prefix = '' if pruner is None else 'regularized_{:e}_'.format(cfg.reg)
+    for epoch in range(cfg.start_epoch, epochs):
+        if cfg.distributed:
+            train_sampler.set_epoch(epoch)
+        train_one_epoch(model, criterion, optimizer, data_loader, device, epoch, cfg, model_ema, scaler, pruner, recover=recover)
+        lr_scheduler.step()
+        acc = evaluate(model, criterion, data_loader_test, device=device)
+        if model_ema:
+            acc = evaluate(model_ema, criterion, data_loader_test, device=device, log_suffix="EMA")
+        if cfg.output_dir:
+            checkpoint = {
+                "model": model_without_ddp.state_dict() if state_dict_only else model_without_ddp,
+                "optimizer": optimizer.state_dict(),
+                "lr_scheduler": lr_scheduler.state_dict(),
+                "epoch": epoch,
+                "args": cfg,
+            }
+            if model_ema:
+                checkpoint["model_ema"] = model_ema.state_dict()
+            if scaler:
+                checkpoint["scaler"] = scaler.state_dict()
+            if acc>best_acc:
+                best_acc=acc
+                utils.save_on_master(checkpoint, os.path.join(cfg.output_dir, prefix+"best.pth"))
+            utils.save_on_master(checkpoint, os.path.join(cfg.output_dir, prefix+"latest.pth"))
+        print("Epoch {}/{}, Current Best Acc = {:.6f}".format(epoch, epochs, best_acc))
+
+    total_time = time.time() - start_time
+    total_time_str = str(datetime.timedelta(seconds=int(total_time)))
+    print(f"Training time {total_time_str}")
+    if cfg.distributed:
+        torch.distributed.destroy_process_group()
+    return model_without_ddp
+
+
+
+
+def visualize_acc_speed_up_curve(
+        models,
+        labels,
+        test_loader,
+        base_speed_up,
+        cfg,
+        max_speed_up = 5.0,
+        marker = 'o',
+        save_dir ='tmp/',
+        name = 'tmp.png',
+        ylim = (0.0, 1.0),
+):
+    def get_acc_speed_up_list(
+        model,
+        test_loader,
+        base_speed_up,
+        max_speed_up = 5.0,
+    ):
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        model.to(device)
+        if cfg.distributed and cfg.sync_bn:
+            model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        if cfg.label_smoothing>0:
+            criterion = nn.CrossEntropyLoss(label_smoothing=cfg.label_smoothing)
+        else:
+            criterion = nn.CrossEntropyLoss()
+        model_without_ddp = model
+        if cfg.distributed:
+            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.gpu])
+            model_without_ddp = model.module
+        example_inputs = torch.ones((1, 3, 32, 32)).to(device)
+        pruner = get_pruner(model, example_inputs, cfg)
+        base_ops, _ = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
+        current_speed_up = 1.0
+        acc1, acc5 = evaluate(model, criterion, test_loader, device)
+        acc1_list = [acc1 / 100]
+        acc5_list = [acc5 / 100]
+        speed_up_list = [base_speed_up]
+        while current_speed_up < max_speed_up / base_speed_up:
+            pruner.step()
+            pruned_ops, _ = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
+            acc1, acc5 = evaluate(model, criterion, test_loader, device)
+            current_speed_up = float(base_ops) / pruned_ops
+            acc1_list.append(acc1 / 100)
+            acc5_list.append(acc5 / 100)
+            speed_up_list.append(current_speed_up * base_speed_up)
+        del pruner
+        if cfg.distributed:
+            torch.distributed.destroy_process_group()
+        return acc1_list, acc5_list, speed_up_list
+    
+
+    os.makedirs(save_dir, exist_ok=True)
+    print("Start visualizing")
+    plt.figure(figsize=(20, 20))
+    if isinstance(models, list):
+        assert isinstance(base_speed_up, list), 'if models are list, base_speed_up must be list !'
+        for i, m in enumerate(models):
+            acc1_list, acc5_list, speed_up_list = get_acc_speed_up_list(m, test_loader, base_speed_up[i], max_speed_up)
+            plt.plot(speed_up_list, acc1_list, marker=marker, label=f"{labels[i]}_acc1")
+            plt.plot(speed_up_list, acc5_list, marker=marker, label=f"{labels[i]}_acc5")
+            print(f"Model {i+1}/{len(models)} visualized")
+    else:
+        acc1_list, acc5_list, speed_up_list = get_acc_speed_up_list(models, test_loader, base_speed_up, max_speed_up)
+        plt.plot(speed_up_list, acc1_list, marker=marker, label=f"{labels}_acc1")
+        plt.plot(speed_up_list, acc5_list, marker=marker, label=f"{labels}_acc5")
+    plt.xlabel('Speed Up')
+    plt.ylabel('Test Acc')
+    plt.title('Speed Up vs Test Acc')
+    plt.xlim(1.0, max_speed_up)
+    plt.ylim(ylim)
+    plt.locator_params(axis='y', nbins=50)
+    plt.grid()
+    plt.legend(loc='upper right')
+    plt.savefig(os.path.join(save_dir, name))
+    plt.close()  # Close the figure to free memory
+    print("End visualizing") 
+
 
 
 @hydra.main(config_path="configs", config_name="base", version_base=None)
@@ -501,35 +740,9 @@ def main(cfg: DictConfig) -> None:
             state_dict_only=False,
         )
         
-    elif cfg.run == 'prune':
-        pruner = get_pruner(model, example_inputs=example_inputs, cfg=cfg)
-        model = model.to("cpu")
-        print("Pruning model...")
-        prune_to_target_flops(pruner, model, cfg.target_flops, example_inputs, cfg)
-        pruned_ops, pruned_size = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
-        print("="*16)
-        print("After pruning:")
-        print(model)
-        print("Params: {:.2f} M => {:.2f} M ({:.2f}%)".format(base_params / 1e6, pruned_size / 1e6, pruned_size / base_params * 100))
-        print("Ops: {:.2f} G => {:.2f} G ({:.2f}%, {:.2f}X )".format(base_ops / 1e9, pruned_ops / 1e9, pruned_ops / base_ops * 100, base_ops / pruned_ops))
-        print("="*16)
-
-        dataset, dataset_test, train_sampler, test_sampler = load_data(train_dir, val_dir, cfg)
-        print("Finetuning...")
-        train(
-            model,
-            cfg.epochs,
-            lr=cfg.lr,
-            lr_step_size=cfg.lr_step_size,
-            lr_warmup_epochs=cfg.lr_warmup_epochs,
-            train_sampler=train_sampler,
-            data_loader=data_loader,
-            data_loader_test=data_loader_test,
-            device=device,
-            cfg=cfg,
-            pruner=None,
-            state_dict_only=False,
-        )
+    elif cfg.run == 'visualize':
+        visualize_acc_speed_up_curve(model, 'pretrained', data_loader_test, 1.0, cfg, max_speed_up=5.0,
+                                     save_dir=cfg.output_dir, name='pretrained.png', ylim=(0.0, 1.0))        
 
     elif cfg.run == 'train':
         train(
@@ -560,7 +773,7 @@ def main(cfg: DictConfig) -> None:
             criterion = nn.CrossEntropyLoss()
 
         # scaler = torch.cuda.amp.GradScaler() if args.amp else None
-        scaler = torch.amp.GradScaler("cuda") if cfg.amp else None
+        scaler = torch.cuda.amp.GradScaler() if cfg.amp else None
         model_without_ddp = model
         if cfg.distributed:
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.gpu])
