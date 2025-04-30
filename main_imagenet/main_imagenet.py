@@ -446,11 +446,11 @@ def main(cfg: DictConfig) -> None:
     print("Ops: {:.4f} G".format(base_ops / 1e9))
     print("="*16)
 
-    if cfg.run == 'prune':
+    if cfg.run == 'prune_sl':
         pruner = get_pruner(model, example_inputs=example_inputs, cfg=cfg)
         if cfg.sparsity_learning:
             if cfg.sl_resume:
-                print("Loading sparse model from {}...".format(args.sl_resume))
+                print("Loading sparse model from {}...".format(cfg.sl_resume))
                 model.load_state_dict(torch.load(cfg.sl_resume, map_location="cpu")["model"])
             else:
                 print("Sparsifying model...")
@@ -500,8 +500,36 @@ def main(cfg: DictConfig) -> None:
             pruner=None,
             state_dict_only=False,
         )
+        
+    elif cfg.run == 'prune':
+        pruner = get_pruner(model, example_inputs=example_inputs, cfg=cfg)
+        model = model.to("cpu")
+        print("Pruning model...")
+        prune_to_target_flops(pruner, model, cfg.target_flops, example_inputs, cfg)
+        pruned_ops, pruned_size = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
+        print("="*16)
+        print("After pruning:")
+        print(model)
+        print("Params: {:.2f} M => {:.2f} M ({:.2f}%)".format(base_params / 1e6, pruned_size / 1e6, pruned_size / base_params * 100))
+        print("Ops: {:.2f} G => {:.2f} G ({:.2f}%, {:.2f}X )".format(base_ops / 1e9, pruned_ops / 1e9, pruned_ops / base_ops * 100, base_ops / pruned_ops))
+        print("="*16)
 
-
+        dataset, dataset_test, train_sampler, test_sampler = load_data(train_dir, val_dir, cfg)
+        print("Finetuning...")
+        train(
+            model,
+            cfg.epochs,
+            lr=cfg.lr,
+            lr_step_size=cfg.lr_step_size,
+            lr_warmup_epochs=cfg.lr_warmup_epochs,
+            train_sampler=train_sampler,
+            data_loader=data_loader,
+            data_loader_test=data_loader_test,
+            device=device,
+            cfg=cfg,
+            pruner=None,
+            state_dict_only=False,
+        )
 
     elif cfg.run == 'train':
         train(
