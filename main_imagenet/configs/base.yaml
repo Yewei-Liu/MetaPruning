@@ -2,6 +2,7 @@ _recursive_: True
 
 name: Ame
 run: train
+index: 0
 
 data_path: "../../imagenet"
 model: "resnet50"
@@ -9,7 +10,8 @@ pretrained: False
 
 
 device: "cuda"
-batch_size: 256
+batch_size: 32
+big_batch_size: 250
 epochs: 90
 workers: 16
 opt: "sgd"
@@ -29,8 +31,8 @@ lr_warmup_decay: 0.01
 lr_step_size: 30
 lr_gamma: 0.1
 lr_min: 0.0
-print_freq: 100
-output_dir: "save/${name}/${run}/${now:%Y-%m-%d_%H-%M-%S}"
+print_freq: 1000
+output_dir: "save/${name}/${index}/${run}"
 resume: ""
 start_epoch: 0
 cache_dataset: True
@@ -70,6 +72,8 @@ soft_keeping_ratio: 0.0
 reg: 0.0001
 delta_reg: 0.0001
 max_pruning_ratio: 1.0
+data_dependency: False
+sparsity_learning: False
 sl_epochs: null
 sl_resume: null
 sl_lr: null
@@ -80,4 +84,7 @@ sl_lr_warmup_epochs: null
 
 hydra:
   run:
-    dir: ./outputs/${name}/${run}/${now:%Y-%m-%d_%H-%M-%S}
+    dir: .
+  job:
+    chdir: false
+  output_subdir: null

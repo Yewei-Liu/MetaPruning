@@ -1,10 +1,15 @@
 #!/bin/bash
 
+INDEX=0  
+RUN_TYPE="visualize"               
+TARGET_FLOPS=4.0   
+NAME=Pretrain  # "Ame"
+PRETRAINED=True
+
 NUM_GPUS=8                     
-MASTER_PORT=29500               
+MASTER_PORT=18900             
 CONFIG_NAME="base"              
-RUN_TYPE="train"               
-TARGET_FLOPS=4.0               
+        
 
 # Find available port
 while true; do
@@ -17,6 +22,8 @@ done
 export HYDRA_FULL_ERROR=1
 export OMP_NUM_THREADS=4
 
+mkdir -p "save/${NAME}/${INDEX}/${RUN_TYPE}"
+
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup \
 torchrun \
     --nproc_per_node=$NUM_GPUS \
@@ -28,4 +35,7 @@ torchrun \
     +experiment=$CONFIG_NAME \
     run=$RUN_TYPE \
     target_flops=$TARGET_FLOPS \
-    > 1.txt &
+    index=$INDEX \
+    name=$NAME \
+    pretrained=$PRETRAINED \
+    > "save/${NAME}/${INDEX}/${RUN_TYPE}/${INDEX}.log" &

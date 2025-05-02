@@ -10,4 +10,5 @@ main/*.txt
 main_imagenet/*.txt
 main_imagenet/outputs/**
 main_imagenet/save/**
+*/__pycache__/
 

@@ -9,6 +9,7 @@ pip install datasets
 pip install importlib_metadata
 pip install termcolor
 pip install h5py
+pip install -e .
 ```
 
 ```bash
