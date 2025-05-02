@@ -22,8 +22,8 @@ def VGG19_on_CIFAR100_generator(level, method, num, cfg, cfg_big_dataset, cfg_sm
         current_speed_up = 1.0
         model = vgg19_bn(num_classes=100)
         train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 200, 0.1, "100,150,180", log=log)
-        current_speed_up, model = progressive_pruning(model, cfg.dataset_name, big_train_loader, big_test_loader, 1.32, cfg.method, log=log)
-        train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 80, 0.01, "40, 70", log=log) 
+        current_speed_up, model = progressive_pruning(model, cfg.dataset_name, big_train_loader, big_test_loader, 3.0, cfg.method, log=log)
+        train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 140, 0.01, "80, 120", log=log) 
         if level == 0:
             data = model.eval().cpu().state_dict()
             data['train_acc'] = train_acc
@@ -64,9 +64,10 @@ def main(cfg):
     current_speed_up = 1.0
     model = vgg19_bn(num_classes=100)
     log=True
-    train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 200, 0.1, "100,150,180", log=log)
-    torch.save(model, "after_train.pth")
-    current_speed_up, model = progressive_pruning(model, cfg.dataset_name, big_train_loader, big_test_loader, 1.32, cfg.method, log=log)
+    # train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 200, 0.1, "100,150,180", log=log)
+    # torch.save(model, "after_train.pth")
+    model = torch.load("after_train.pth")
+    current_speed_up, model = progressive_pruning(model, cfg.dataset_name, big_train_loader, big_test_loader, 3.0, cfg.method, log=log)
     train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 80, 0.01, "40, 70", log=log) 
 
     # level=1

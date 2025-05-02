@@ -162,10 +162,16 @@ def meta_train(
                     if param.requires_grad:
                         param.grad = torch.zeros_like(param)    
                 pruner.regularize(model)
+                big_tensor = []
+                big_gradient = []
                 for name, param in model.named_parameters():
                     if param.requires_grad:
                         if not torch.isnan(param.grad).any():
-                            state_dict[name].backward(gradient = param.grad.detach().clone(), retain_graph=True)
+                            big_tensor.append(state_dict[name].flatten())
+                            big_gradient.append(param.grad.flatten().detach().clone())
+                big_tensor = torch.cat(big_tensor, dim=0)
+                big_gradient = torch.cat(big_gradient, dim=0)
+                big_tensor.backward(gradient=big_gradient)
                 optimizer.step()
                 del pruner
                 

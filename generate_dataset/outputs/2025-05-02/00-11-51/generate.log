@@ -52,10 +52,6 @@ small_batch_dataset:
   num_workers: ${dataset.num_workers}
   dataset_path: ${dataset.dataset_path}
 
-Generating train split: 0 examples [00:00, ? examples/s]Files already downloaded and verified
-Files already downloaded and verified
-Files already downloaded and verified
-Files already downloaded and verified
 [2025-05-02 00:12:03,261][train][INFO] - Before training : Train Acc=0.0104  Val Acc=0.0099
 [2025-05-02 00:12:11,427][train][INFO] - Epoch 1/200, Val Acc=0.0883, Val Loss=3.8446, lr=0.1000
 [2025-05-02 00:12:19,674][train][INFO] - Epoch 2/200, Val Acc=0.1180, Val Loss=3.6895, lr=0.1000
@@ -402,7 +398,7 @@ Files already downloaded and verified
 [2025-05-02 00:57:19,167][train][INFO] - Epoch 139/140, Val Acc=0.7248, Val Loss=1.3700, lr=0.0001
 [2025-05-02 00:57:26,010][train][INFO] - Epoch 140/140, Val Acc=0.7262, Val Loss=1.3698, lr=0.0001
 [2025-05-02 00:57:31,321][train][INFO] - After training : Train Acc=0.9990  Val Acc=0.7262
-Generating train split: 1 examples [45:37, 2737.50s/ examples][2025-05-02 00:57:36,643][train][INFO] - Before training : Train Acc=0.0100  Val Acc=0.0100
+[2025-05-02 00:57:36,643][train][INFO] - Before training : Train Acc=0.0100  Val Acc=0.0100
 [2025-05-02 00:57:44,646][train][INFO] - Epoch 1/200, Val Acc=0.0991, Val Loss=3.8368, lr=0.1000
 [2025-05-02 00:57:52,970][train][INFO] - Epoch 2/200, Val Acc=0.1304, Val Loss=3.5624, lr=0.1000
 [2025-05-02 00:58:01,545][train][INFO] - Epoch 3/200, Val Acc=0.1373, Val Loss=3.6171, lr=0.1000
@@ -748,7 +744,7 @@ Files already downloaded and verified
 [2025-05-02 01:43:59,947][train][INFO] - Epoch 139/140, Val Acc=0.7244, Val Loss=1.3619, lr=0.0001
 [2025-05-02 01:44:07,659][train][INFO] - Epoch 140/140, Val Acc=0.7245, Val Loss=1.3585, lr=0.0001
 [2025-05-02 01:44:12,737][train][INFO] - After training : Train Acc=0.9993  Val Acc=0.7245
-Generating train split: 2 examples [1:32:18, 2775.09s/ examples][2025-05-02 01:44:18,225][train][INFO] - Before training : Train Acc=0.0100  Val Acc=0.0100
+[2025-05-02 01:44:18,225][train][INFO] - Before training : Train Acc=0.0100  Val Acc=0.0100
 [2025-05-02 01:44:26,821][train][INFO] - Epoch 1/200, Val Acc=0.0944, Val Loss=3.9401, lr=0.1000
 [2025-05-02 01:44:35,242][train][INFO] - Epoch 2/200, Val Acc=0.1296, Val Loss=3.5454, lr=0.1000
 [2025-05-02 01:44:43,790][train][INFO] - Epoch 3/200, Val Acc=0.1886, Val Loss=3.2335, lr=0.1000
@@ -1094,7 +1090,7 @@ Files already downloaded and verified
 [2025-05-02 02:30:34,127][train][INFO] - Epoch 139/140, Val Acc=0.7299, Val Loss=1.3055, lr=0.0001
 [2025-05-02 02:30:42,027][train][INFO] - Epoch 140/140, Val Acc=0.7305, Val Loss=1.3104, lr=0.0001
 [2025-05-02 02:30:47,241][train][INFO] - After training : Train Acc=0.9992  Val Acc=0.7305
-Generating train split: 3 examples [2:18:53, 2783.95s/ examples][2025-05-02 02:30:52,867][train][INFO] - Before training : Train Acc=0.0100  Val Acc=0.0100
+[2025-05-02 02:30:52,867][train][INFO] - Before training : Train Acc=0.0100  Val Acc=0.0100
 [2025-05-02 02:31:01,132][train][INFO] - Epoch 1/200, Val Acc=0.0848, Val Loss=3.9119, lr=0.1000
 [2025-05-02 02:31:09,623][train][INFO] - Epoch 2/200, Val Acc=0.1286, Val Loss=3.6121, lr=0.1000
 [2025-05-02 02:31:18,161][train][INFO] - Epoch 3/200, Val Acc=0.1887, Val Loss=3.2014, lr=0.1000
@@ -1440,7 +1436,7 @@ Files already downloaded and verified
 [2025-05-02 03:17:44,860][train][INFO] - Epoch 139/140, Val Acc=0.7303, Val Loss=1.3355, lr=0.0001
 [2025-05-02 03:17:53,291][train][INFO] - Epoch 140/140, Val Acc=0.7315, Val Loss=1.3365, lr=0.0001
 [2025-05-02 03:17:58,642][train][INFO] - After training : Train Acc=0.9993  Val Acc=0.7315
-Generating train split: 4 examples [3:06:04, 2802.68s/ examples][2025-05-02 03:18:04,195][train][INFO] - Before training : Train Acc=0.0100  Val Acc=0.0100
+[2025-05-02 03:18:04,195][train][INFO] - Before training : Train Acc=0.0100  Val Acc=0.0100
 [2025-05-02 03:18:12,614][train][INFO] - Epoch 1/200, Val Acc=0.0808, Val Loss=3.9847, lr=0.1000
 [2025-05-02 03:18:21,164][train][INFO] - Epoch 2/200, Val Acc=0.1176, Val Loss=3.6766, lr=0.1000
 [2025-05-02 03:18:29,811][train][INFO] - Epoch 3/200, Val Acc=0.1903, Val Loss=3.2164, lr=0.1000
@@ -1786,6 +1782,4 @@ Files already downloaded and verified
 [2025-05-02 04:05:00,634][train][INFO] - Epoch 139/140, Val Acc=0.7276, Val Loss=1.3556, lr=0.0001
 [2025-05-02 04:05:07,645][train][INFO] - Epoch 140/140, Val Acc=0.7264, Val Loss=1.3574, lr=0.0001
 [2025-05-02 04:05:12,735][train][INFO] - After training : Train Acc=0.9992  Val Acc=0.7264
-Generating train split: 5 examples [3:53:18, 2814.01s/ examples]Generating train split: 5 examples [3:53:56, 2807.22s/ examples]
-Saving the dataset (0/1 shards):   0%|          | 0/5 [00:00<?, ? examples/s]Saving the dataset (0/1 shards): 100%|██████████| 5/5 [00:00<00:00, 49.26 examples/s]Saving the dataset (1/1 shards): 100%|██████████| 5/5 [00:00<00:00, 49.26 examples/s]Saving the dataset (1/1 shards): 100%|██████████| 5/5 [00:00<00:00, 48.50 examples/s]
 [2025-05-02 04:05:50,099][generator][INFO] - Elapsed time: 233.94 minutes

@@ -33,11 +33,11 @@ dataset_model:
 meta_train:
   epochs: 100
   lr : 0.001 
-  lr_decay_milestones : "10"
+  lr_decay_milestones : "100"
   lr_decay_gamma : 0.1
   weight_decay : 5e-4
   method : ${method}
-  pruner_reg : [10, 10]
+  pruner_reg : [10]
   save_every_epoch : 1
   warm_up : 0
   level: ${level}
@@ -84,7 +84,7 @@ visualize:
   ylim: [0.0, 1.0]
 
 pruning:
-  pruning_index: [2.2, 1.6]
+  pruning_index: [3.0]
   level: ${level}
   method: ${method}
   finetune:
