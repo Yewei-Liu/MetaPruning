@@ -76,6 +76,7 @@ pruning:
   pruning_index: 2.86
   level: ${level}
   method: ${method}
+  opt: 'sgd'
   finetune:
     after_pruning:
       epochs: 140

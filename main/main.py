@@ -114,7 +114,7 @@ def main(cfg):
             train(new_model, small_train_loader, big_test_loader, cfg.pruning.finetune.after_metanetwork.epochs,
                   cfg.pruning.finetune.after_metanetwork.lr, cfg.pruning.finetune.after_metanetwork.lr_decay_milestones,
                   cfg.pruning.finetune.after_metanetwork.lr_decay_gamma, cfg.pruning.finetune.after_metanetwork.weight_decay,
-                  log=log, return_best=True)
+                  log=log, return_best=True, opt=cfg.pruning.opt)
             return new_model
         model_list = [model]
         label_list = ['origin']

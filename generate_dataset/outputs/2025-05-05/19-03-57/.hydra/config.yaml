@@ -1,0 +1,52 @@
+data_generator:
+  model_name: VGG19
+  dataset_name: CIFAR100
+  big_batch_size: 500
+  small_batch_size: 128
+  num_workers: 4
+  target: generate_dataset.VGG_generator.VGG19_on_CIFAR100_generator
+  cfg:
+    speed_up:
+    - 3.0
+    - 4.0
+    method: ${method}
+    model_name: ${data_generator.model_name}
+    dataset_name: ${data_generator.dataset_name}
+_recursive_: true
+level: 2
+index: 2
+num: 3
+num_proc: 1
+method: group_sl
+name: ${data_generator.model_name}_on_${data_generator.dataset_name}
+model_name: ${data_generator.model_name}
+dataset_name: ${data_generator.dataset_name}
+save_path: ../dataset_model/${name}_level_${level}_${index}
+dataset_path: ../dataset/${data_generator.dataset_name}
+cache_path: .cache/${index}
+generator:
+  _target_: ${data_generator.target}
+  _recursive_: true
+  _partial_: true
+  level: ${level}
+  method: ${method}
+  num: ${num}
+  cfg: ${data_generator.cfg}
+  cfg_big_dataset: ${big_batch_dataset}
+  cfg_small_dataset: ${small_batch_dataset}
+dataset:
+  dataset_name: ${data_generator.dataset_name}
+  num_workers: ${data_generator.num_workers}
+  big_batch: ${data_generator.big_batch_size}
+  small_batch: ${data_generator.small_batch_size}
+  dataset_path: ${dataset_path}
+big_batch_dataset:
+  dataset_name: ${dataset.dataset_name}
+  batch_size: ${dataset.big_batch}
+  num_workers: ${dataset.num_workers}
+  dataset_path: ${dataset.dataset_path}
+small_batch_dataset:
+  dataset_name: ${dataset.dataset_name}
+  batch_size: ${dataset.small_batch}
+  num_workers: ${dataset.num_workers}
+  dataset_path: ${dataset.dataset_path}

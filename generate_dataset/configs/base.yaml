@@ -4,9 +4,9 @@ defaults:
 
 _recursive_: True 
 
-level: 0
-index: 1  # unique index for parrallel generation and merge
-num: 5 # number of generated data points
+level: 2
+index: 2  # unique index for parrallel generation and merge
+num: 3 # number of generated data points
 num_proc: 1
 method: 'group_sl'
 

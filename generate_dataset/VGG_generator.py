@@ -22,7 +22,7 @@ def VGG19_on_CIFAR100_generator(level, method, num, cfg, cfg_big_dataset, cfg_sm
         current_speed_up = 1.0
         model = vgg19_bn(num_classes=100)
         train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 200, 0.1, "100,150,180", log=log)
-        current_speed_up, model = progressive_pruning(model, cfg.dataset_name, big_train_loader, big_test_loader, 3.0, cfg.method, log=log)
+        current_speed_up, model = progressive_pruning(model, cfg.dataset_name, big_train_loader, big_test_loader, 2.0, cfg.method, log=log)
         train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 140, 0.01, "80, 120", log=log) 
         if level == 0:
             data = model.eval().cpu().state_dict()
@@ -33,23 +33,27 @@ def VGG19_on_CIFAR100_generator(level, method, num, cfg, cfg_big_dataset, cfg_sm
             data['current_speed_up'] = current_speed_up
             yield data
         for j in range(level):
-            metanetwork = torch.load(os.path.join(metanetwork_dir, f'{j}.pth'))
-            metanetwork.to(device)
-            node_index, node_features, edge_index, edge_features = state_dict_to_graph(cfg.model_name, model.state_dict())
-            node_pred, edge_pred = metanetwork.forward(node_features.to(device), edge_index.to(device), edge_features.to(device))
-            model = graph_to_model(cfg.model_name, model.state_dict(), node_index, node_pred, edge_index, edge_pred)
-            train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 100, 0.01, "60, 80", return_best=True, log=log)
-            speed_up, model = progressive_pruning(model, cfg.dataset_name, big_train_loader, big_test_loader, cfg.speed_up[j], method=method, log=log)
-            current_speed_up *= speed_up
-            train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 140, 0.01, "80, 120", return_best=True, log=log) 
-            if j == level - 1:
-                data = model.eval().cpu().state_dict()
-                data['train_acc'] = train_acc
-                data['train_loss'] = train_loss
-                data['val_acc'] = val_acc
-                data['val_loss'] = val_loss        
-                data['current_speed_up'] = current_speed_up
-                yield data
+            def _one_iter():
+                nonlocal model, current_speed_up
+                metanetwork = torch.load(os.path.join(metanetwork_dir, f'{j}.pth'))
+                metanetwork.to(device)
+                node_index, node_features, edge_index, edge_features = state_dict_to_graph(cfg.model_name, model.state_dict())
+                node_pred, edge_pred = metanetwork.forward(node_features.to(device), edge_index.to(device), edge_features.to(device))
+                model = graph_to_model(cfg.model_name, model.state_dict(), node_index, node_pred, edge_index, edge_pred)
+                train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 100, 0.01, "60, 80", return_best=True, log=log)
+                speed_up, model = progressive_pruning(model, cfg.dataset_name, big_train_loader, big_test_loader, cfg.speed_up[j] / current_speed_up, method=method, log=log)
+                current_speed_up *= speed_up
+                train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 140, 0.01, "80, 120", return_best=True, log=log) 
+                logging.info(f'level : {j + 1}, train acc: {train_acc}, train loss: {train_loss}, val acc: {val_acc}, val loss: {val_loss}')
+                if j == level - 1:
+                    data = model.eval().cpu().state_dict()
+                    data['train_acc'] = train_acc
+                    data['train_loss'] = train_loss
+                    data['val_acc'] = val_acc
+                    data['val_loss'] = val_loss        
+                    data['current_speed_up'] = current_speed_up
+                    yield data
+            yield from _one_iter()
     for i in range(num):
         yield from one_generate_step()
         
@@ -67,8 +71,15 @@ def main(cfg):
     # train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 200, 0.1, "100,150,180", log=log)
     # torch.save(model, "after_train.pth")
     model = torch.load("after_train.pth")
-    current_speed_up, model = progressive_pruning(model, cfg.dataset_name, big_train_loader, big_test_loader, 3.0, cfg.method, log=log)
-    train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 80, 0.01, "40, 70", log=log) 
+    speed_up, model = progressive_pruning(model, cfg.dataset_name, big_train_loader, big_test_loader, 2.0, cfg.method, log=log)
+    current_speed_up *= speed_up
+    train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 140, 0.01, "80, 120", log=log) 
+    torch.save(model, "after_pruning_2.0.pth")
+    speed_up, model = progressive_pruning(model, cfg.dataset_name, big_train_loader, big_test_loader, 4.0 / current_speed_up, cfg.method, log=log)
+    current_speed_up *= speed_up
+    train_acc, train_loss, val_acc, val_loss = train(model, small_train_loader, big_test_loader, 140, 0.01, "80, 120", log=log) 
+    torch.save(model, "after_pruning_4.0.pth")
+
 
     # level=1
     # metanetwork_dir = os.path.join('metanetwork', f'{cfg.model_name}_on_{cfg.dataset_name}')

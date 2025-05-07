@@ -4,7 +4,7 @@ defaults:
 
 __recursive_: True
 
-name: Eva
+name: Harry
 level: 0
 run: meta_train
 method: 'group_sl'

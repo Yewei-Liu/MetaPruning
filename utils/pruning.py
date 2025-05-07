@@ -110,15 +110,15 @@ def pruning_one_step(model,
     method = cfg.method
     # adaptive_pruning_first = cfg.adaptive_pruning_first
 
-    def train_with_cfg(model, cfg):
+    def train_with_cfg(model, cfg, opt):
         return train(model, small_train_loader, big_test_loader, cfg.epochs, cfg.lr, cfg.lr_decay_milestones, cfg.lr_decay_gamma, 
-                     cfg.weight_decay, log=log, return_best=True)
+                     cfg.weight_decay, log=log, return_best=True, opt=opt)
     def finetune(model, mode):
         if mode == 'after pruning':
-            train_acc, train_loss, val_acc, val_loss = train_with_cfg(model, cfg.finetune.after_pruning)
+            train_acc, train_loss, val_acc, val_loss = train_with_cfg(model, cfg.finetune.after_pruning, cfg.opt)
             return train_acc, train_loss, val_acc, val_loss
         elif mode == 'after metanetwork':
-            train_acc, train_loss, val_acc, val_loss = train_with_cfg(model, cfg.finetune.after_metanetwork)
+            train_acc, train_loss, val_acc, val_loss = train_with_cfg(model, cfg.finetune.after_metanetwork, cfg.opt)
             return train_acc, train_loss, val_acc, val_loss
         else:
             raise NotImplementedError

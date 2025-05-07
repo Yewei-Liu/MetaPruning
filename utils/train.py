@@ -38,6 +38,7 @@ def train(
     dataset_name=None,
     reg=0.001,
     return_best=False,
+    opt='sgd'
 ):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -47,16 +48,24 @@ def train(
     else:
         example_inputs = torch.ones((1, 3, 32, 32)).to(device)
         pruner = get_pruner(model, example_inputs, reg, dataset_name, method=method)
-    optimizer = torch.optim.SGD(
-        model.parameters(),
-        lr=lr,
-        momentum=0.9,
-        weight_decay=weight_decay if pruner is None else 0,
-    )
-    milestones = [int(ms) for ms in lr_decay_milestones.split(",")]
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optimizer, milestones=milestones, gamma=lr_decay_gamma
-    )
+    if opt.lower() == 'sgd':
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            lr=lr,
+            momentum=0.9,
+            weight_decay=weight_decay if pruner is None else 0,
+        )
+        milestones = [int(ms) for ms in lr_decay_milestones.split(",")]
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(
+            optimizer, milestones=milestones, gamma=lr_decay_gamma
+        )
+    elif opt.lower() == 'adamw':
+        optimizer = torch.optim.AdamW(model.parameters(), 
+                                        lr=lr, 
+                                        weight_decay=weight_decay if pruner is None else 0)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20)
+    else:
+        raise NotImplementedError(f"Optimizer {opt} not implemented")
     if log:
         logger = get_logger("train")
         train_acc, train_loss = eval(model, train_loader, device=device)
