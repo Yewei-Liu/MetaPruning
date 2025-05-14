@@ -63,44 +63,109 @@ def get_acc_speed_up_list(
     del pruner
     return acc_list, speed_up_list
 
+# def visualize_acc_speed_up_curve(
+#         models,
+#         dataset_name,
+#         labels,
+#         test_loader,
+#         base_speed_up,
+#         max_speed_up = 5.0,
+#         method = 'group_sl', 
+#         marker = 'o',
+#         save_dir ='tmp/',
+#         name = 'tmp.png',
+#         ylim = (0.0, 1.0),
+#         log=True,
+#         figsize=(20, 20)
+# ):
+#     os.makedirs(save_dir, exist_ok=True)
+#     if log:
+#         logger = get_logger("Visualize acc speed up curve")
+#         logger.info("Start visualizing")
+#     plt.figure(figsize=(20, 20))
+#     if isinstance(models, list):
+#         assert isinstance(base_speed_up, list), 'if models are list, base_speed_up must be list !'
+#         for i, m in enumerate(models):
+#             acc_list, speed_up_list = get_acc_speed_up_list(m, dataset_name, test_loader, base_speed_up[i], max_speed_up, method)
+#             plt.plot(speed_up_list, acc_list, marker=marker, label=labels[i])
+#             if log:
+#                 logger.info(f"Model {i+1}/{len(models)} visualized")
+#     else:
+#         acc_list, speed_up_list = get_acc_speed_up_list(models, dataset_name, test_loader, base_speed_up, max_speed_up, method)
+#         plt.plot(speed_up_list, acc_list, marker=marker, label=labels)
+#     plt.xlabel('Speed Up')
+#     plt.ylabel('Test Acc')
+#     plt.title('Speed Up vs Test Acc')
+#     plt.xlim(1.0, max_speed_up)
+#     plt.ylim(ylim)
+#     plt.locator_params(axis='y', nbins=50)
+#     plt.grid()
+#     plt.legend(loc='upper right')
+#     plt.savefig(os.path.join(save_dir, name))
+#     plt.close()  # Close the figure to free memory
+#     if log:
+#         logger.info("End visualizing") 
+
 def visualize_acc_speed_up_curve(
         models,
         dataset_name,
         labels,
         test_loader,
         base_speed_up,
-        max_speed_up = 5.0,
-        method = 'group_sl', 
-        marker = 'o',
-        save_dir ='tmp/',
-        name = 'tmp.png',
-        ylim = (0.0, 1.0),
-        log=True
+        max_speed_up=5.0,
+        method='group_sl', 
+        marker='o',
+        save_dir='tmp/',
+        name='tmp.png',
+        ylim=(0.0, 1.0),
+        log=True,
+        figsize=(20, 20),
+        font_scale=1.5  # New parameter to control font scaling
 ):
     os.makedirs(save_dir, exist_ok=True)
     if log:
         logger = get_logger("Visualize acc speed up curve")
         logger.info("Start visualizing")
-    plt.figure(figsize=(20, 20))
+    
+    # Set larger font sizes
+    plt.rcParams.update({
+        'font.size': 12 * font_scale,           # General font size
+        'axes.titlesize': 16 * font_scale,      # Title font size
+        'axes.labelsize': 14 * font_scale,      # X and Y labels font size
+        'xtick.labelsize': 12 * font_scale,     # X-axis tick labels
+        'ytick.labelsize': 12 * font_scale,      # Y-axis tick labels
+        'legend.fontsize': 12 * font_scale,      # Legend font size
+        'figure.titlesize': 18 * font_scale      # Figure title size
+    })
+    
+    plt.figure(figsize=figsize)
+    
     if isinstance(models, list):
         assert isinstance(base_speed_up, list), 'if models are list, base_speed_up must be list !'
         for i, m in enumerate(models):
             acc_list, speed_up_list = get_acc_speed_up_list(m, dataset_name, test_loader, base_speed_up[i], max_speed_up, method)
-            plt.plot(speed_up_list, acc_list, marker=marker, label=labels[i])
+            plt.plot(speed_up_list, acc_list, marker=marker, label=labels[i], markersize=4*font_scale, linewidth=2*font_scale)
             if log:
                 logger.info(f"Model {i+1}/{len(models)} visualized")
     else:
         acc_list, speed_up_list = get_acc_speed_up_list(models, dataset_name, test_loader, base_speed_up, max_speed_up, method)
-        plt.plot(speed_up_list, acc_list, marker=marker, label=labels)
-    plt.xlabel('Speed Up')
-    plt.ylabel('Test Acc')
-    plt.title('Speed Up vs Test Acc')
+        plt.plot(speed_up_list, acc_list, marker=marker, label=labels, markersize=4*font_scale, linewidth=2*font_scale)
+    
+    plt.xlabel('Speed Up', fontsize=14 * font_scale)  # You can override individual elements if needed
+    plt.ylabel('Test Acc', fontsize=14 * font_scale)
+    plt.title('Test Acc vs. Speed Up', fontsize=16 * font_scale)
     plt.xlim(1.0, max_speed_up)
     plt.ylim(ylim)
-    plt.locator_params(axis='y', nbins=50)
+    plt.locator_params(axis='y', nbins=20)
     plt.grid()
-    plt.legend(loc='upper right')
-    plt.savefig(os.path.join(save_dir, name))
+    
+    # Make legend larger
+    plt.legend(loc='upper right', prop={'size': 12 * font_scale})
+    
+    # Adjust tick label size
+    plt.tick_params(axis='both', which='major', labelsize=12 * font_scale)
+    
+    plt.savefig(os.path.join(save_dir, name), dpi=300, bbox_inches='tight')  # Higher DPI and tight layout
     plt.close()  # Close the figure to free memory
     if log:
-        logger.info("End visualizing") 
+        logger.info("End visualizing")
