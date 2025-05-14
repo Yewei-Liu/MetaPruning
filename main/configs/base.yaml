@@ -4,7 +4,7 @@ defaults:
 
 __recursive_: True
 
-name: Harry
+name: BBB
 level: 0
 run: meta_train
 method: 'group_sl'

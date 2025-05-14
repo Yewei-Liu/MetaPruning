@@ -31,9 +31,9 @@ dataset_model:
   # val_split = 1 - train_split
 
 meta_train:
-  epochs: 100
+  epochs: 200
   lr : 0.001 
-  lr_decay_milestones : "5"
+  lr_decay_milestones : "15"
   lr_decay_gamma : 0.1
   weight_decay : 5e-4
   method : ${method}
@@ -91,35 +91,37 @@ visualize:
   max_speed_up: 10.0
   marker: 'o'
   save_path: 'save/visualize/${task.dataset_model.dataset_model_name}/${name}/level_${level}/'
-  ylim: [0.0, 1.0]
+  ylim: [0.5, 0.8]
+  figsize: [10, 10]
+  font_scale: 1.5
 
 pruning:
   pruning_index: [8.95]
   level: ${level}
   method: ${method}
-  opt: 'adamw'
+  opt: 'sgd'
   finetune:
-    # after_pruning:
-    #   epochs: 2000
-    #   lr: 0.01
-    #   lr_decay_milestones: "1850, 1950"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_metanetwork:
-    #   epochs: 2000
-    #   lr: 0.01
-    #   lr_decay_milestones: "1850, 1950"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
+    after_pruning:
+      epochs: 2000
+      lr: 0.01
+      lr_decay_milestones: "1850, 1950"
+      lr_decay_gamma: 0.1
+      weight_decay: 0.0005
+    after_metanetwork:
+      epochs: 2000
+      lr: 0.01
+      lr_decay_milestones: "1850, 1950"
+      lr_decay_gamma: 0.1
+      weight_decay: 0.0005
     # after_pruning:
     #   epochs: 300
-    #   lr: 0.01
+    #   lr: 0.001
     #   lr_decay_milestones: "150,250"
     #   lr_decay_gamma: 0.1
     #   weight_decay: 0.0005
     # after_metanetwork:
     #   epochs: 300
-    #   lr: 0.01
+    #   lr: 0.001
     #   lr_decay_milestones: "150,250"
     #   lr_decay_gamma: 0.1
     #   weight_decay: 0.0005
