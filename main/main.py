@@ -18,7 +18,6 @@ import torchvision.transforms as transforms
 from torch.func import functional_call
 import torchvision
 import torch_pruning as tp
-from torch.utils.tensorboard import SummaryWriter
 from generate_dataset.resnet_deep_family import resnet50
 
 from datasets import Dataset
@@ -106,7 +105,7 @@ def main(cfg):
                 raise ValueError(f"no metanetwork found with index {index}")
             elif len(matching_files) >= 2:
                 raise ValueError(f"More than one metanetwork found with index {index}")
-            metanetwork = torch.load(matching_files[0])
+            metanetwork = torch.load(matching_files[0], weights_only=False)
             return metanetwork
         def get_new_model(metanetwork):
             node_pred, edge_pred = metanetwork.forward(node_features.to(device), edge_index.to(device), edge_features.to(device))
@@ -141,7 +140,7 @@ def main(cfg):
             raise ValueError(f"no metanetwork found with index {index}")
         elif len(matching_files) >= 2:
             raise ValueError(f"More than one metanetwork found with index {index}")
-        metanetwork = torch.load(matching_files[0])
+        metanetwork = torch.load(matching_files[0], weights_only=False)
         model, origin_state_dict, info, node_index, node_features, edge_index, edge_features = next(iter(model_val_loader))
         pruning_one_step(model, cfg.model_name, cfg.dataset.dataset_name, info, origin_state_dict, big_train_loader, small_train_loader, 
                          big_test_loader, metanetwork, cfg.pruning, info['current_speed_up'], log=log)

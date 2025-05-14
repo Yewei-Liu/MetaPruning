@@ -18,10 +18,10 @@ def get_pruner(model,
                method = "group_sl",
                global_pruning=True):
     if method == "group_norm":
-        imp = tp.importance.GroupNormImportance(p=2)
+        imp = tp.importance.GroupMagnitudeImportance(p=2)
         pruner_entry = partial(tp.pruner.GroupNormPruner, reg=reg, global_pruning=global_pruning)
     elif method == "group_sl":
-        imp = tp.importance.GroupNormImportance(p=2, normalizer='max') # normalized by the maximum score for CIFAR
+        imp = tp.importance.GroupMagnitudeImportance(p=2, normalizer='max') # normalized by the maximum score for CIFAR
         pruner_entry = partial(tp.pruner.GroupNormPruner, reg=reg, global_pruning=global_pruning)
     else:
         raise NotImplementedError(f"Method {method} is not a valid method.")

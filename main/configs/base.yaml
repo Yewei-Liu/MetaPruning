@@ -1,3 +1,25 @@
+defaults:
+  - task: VGG19_on_CIFAR100
+  - _self_
+
+__recursive_: True
+
+name: Harry
+level: 0
+run: meta_train
+method: 'group_sl'
+log: True
+reproduce_index: 20
+seed: 7
+
+# no need to change
+index: 'train' 
+
+hydra:
+  run:
+    dir: ./outputs/${task.task_name}/${name}/level_${level}/${run}/${index}/${now:%Y-%m-%d_%H-%M-%S}
+
+
 # defaults:
 #   - task: VGG19_on_CIFAR100
 #   - _self_

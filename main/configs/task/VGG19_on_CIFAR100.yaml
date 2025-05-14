@@ -91,8 +91,9 @@ visualize:
   max_speed_up: 10.0
   marker: 'o'
   save_path: 'save/visualize/${task.dataset_model.dataset_model_name}/${name}/level_${level}/'
-  ylim: [0.0, 1.0]
+  ylim: [0.5, 0.8]
   figsize: [10, 10]
+  font_scale: 1.5
 
 pruning:
   pruning_index: [8.95]
@@ -100,42 +101,42 @@ pruning:
   method: ${method}
   opt: 'sgd'
   finetune:
-    # after_pruning:
-    #   epochs: 2000
-    #   lr: 0.01
-    #   lr_decay_milestones: "1850, 1950"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_metanetwork:
-    #   epochs: 2000
-    #   lr: 0.01
-    #   lr_decay_milestones: "1850, 1950"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_pruning:
-    #   epochs: 300
-    #   lr: 0.01
-    #   lr_decay_milestones: "150,250"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_metanetwork:
-    #   epochs: 300
-    #   lr: 0.01
-    #   lr_decay_milestones: "150,250"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
     after_pruning:
-      epochs: 140
+      epochs: 2000
       lr: 0.01
-      lr_decay_milestones: "80,120"
+      lr_decay_milestones: "1850, 1950"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
     after_metanetwork:
-      epochs: 100
+      epochs: 2000
       lr: 0.01
-      lr_decay_milestones: "60,90"
+      lr_decay_milestones: "1850, 1950"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
+    # after_pruning:
+    #   epochs: 300
+    #   lr: 0.001
+    #   lr_decay_milestones: "150,250"
+    #   lr_decay_gamma: 0.1
+    #   weight_decay: 0.0005
+    # after_metanetwork:
+    #   epochs: 300
+    #   lr: 0.001
+    #   lr_decay_milestones: "150,250"
+    #   lr_decay_gamma: 0.1
+    #   weight_decay: 0.0005
+    # after_pruning:
+    #   epochs: 140
+    #   lr: 0.01
+    #   lr_decay_milestones: "80,120"
+    #   lr_decay_gamma: 0.1
+    #   weight_decay: 0.0005
+    # after_metanetwork:
+    #   epochs: 100
+    #   lr: 0.01
+    #   lr_decay_milestones: "60,90"
+    #   lr_decay_gamma: 0.1
+    #   weight_decay: 0.0005
 
     
 
