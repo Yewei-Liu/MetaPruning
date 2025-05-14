@@ -67,13 +67,15 @@ metanetwork:
     edge_res_ratio: 0.01
 
 visualize:
-  max_speed_up: 5.0
+  max_speed_up: 3.0
   marker: 'o'
   save_path: 'save/visualize/${task.dataset_model.dataset_model_name}/${name}/level_${level}/'
-  ylim: [0.0, 1.0]
+  ylim: [0.8, 1.0]
+  figsize: [10, 10]
+  font_scale: 1.5
 
 pruning:
-  pruning_index: 2.86
+  pruning_index: 2.3
   level: ${level}
   method: ${method}
   opt: 'sgd'

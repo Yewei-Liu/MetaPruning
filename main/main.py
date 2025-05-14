@@ -126,7 +126,7 @@ def main(cfg):
         visualize_acc_speed_up_curve( model_list, cfg.dataset.dataset_name, label_list,
                                       big_test_loader, [info['current_speed_up'] for i in range(len(model_list))], cfg.visualize.max_speed_up, cfg.meta_train.method,
                                       cfg.visualize.marker, save_dir=cfg.visualize.save_path, name=f"{index_list_name}.png",
-                                      ylim=cfg.visualize.ylim, log=log)
+                                      ylim=cfg.visualize.ylim, log=log, figsize=cfg.visualize.figsize, font_scale=cfg.visualize.font_scale)
     
     elif run == 'pruning_one_step':
         save_dir = cfg.meta_train.save_path
