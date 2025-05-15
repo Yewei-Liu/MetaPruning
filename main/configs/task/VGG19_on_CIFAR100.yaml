@@ -37,7 +37,7 @@ meta_train:
   lr_decay_gamma : 0.1
   weight_decay : 5e-4
   method : ${method}
-  pruner_reg : [10,10,10]
+  pruner_reg : [10]
   save_every_epoch : 1
   warm_up : 0
   level: ${level}
@@ -63,24 +63,6 @@ metanetwork:
     _recursive_: True
     num_layer: 8
     hiddim: 32
-    in_node_dim: 5
-    in_edge_dim: 9
-    node_res_ratio: 0.01
-    edge_res_ratio: 0.01
-  '1':
-    _target_: nn.GNN.MyGNN
-    _recursive_: True
-    num_layer: 8
-    hiddim: 64
-    in_node_dim: 5
-    in_edge_dim: 9
-    node_res_ratio: 0.01
-    edge_res_ratio: 0.01
-  '2':
-    _target_: nn.GNN.MyGNN
-    _recursive_: True
-    num_layer: 12
-    hiddim: 96
     in_node_dim: 5
     in_edge_dim: 9
     node_res_ratio: 0.01
@@ -113,30 +95,7 @@ pruning:
       lr_decay_milestones: "1850, 1950"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
-    # after_pruning:
-    #   epochs: 300
-    #   lr: 0.001
-    #   lr_decay_milestones: "150,250"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_metanetwork:
-    #   epochs: 300
-    #   lr: 0.001
-    #   lr_decay_milestones: "150,250"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_pruning:
-    #   epochs: 140
-    #   lr: 0.01
-    #   lr_decay_milestones: "80,120"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_metanetwork:
-    #   epochs: 100
-    #   lr: 0.01
-    #   lr_decay_milestones: "60,90"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
+
 
     
 

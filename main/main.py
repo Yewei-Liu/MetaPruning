@@ -25,6 +25,7 @@ from utils.logging import get_logger
 from utils.visualize import visualize_subgraph
 from utils.convert import graph_to_state_dict, state_dict_to_model, state_dict_to_graph, graph_to_model
 from generate_dataset.resnet_family import resnet56, MyResNet
+from generate_dataset.VGG_family import vgg19_bn, MyVGG
 from utils.pruning import get_pruner, adaptive_pruning, pruning_one_step, progressive_pruning
 from utils.train import train, eval
 from utils.visualize import visualize_acc_speed_up_curve
@@ -165,6 +166,15 @@ def main(cfg):
             model = pruning_one_step(model, cfg.model_name, cfg.dataset.dataset_name, info, model.state_dict(), 
                                                big_train_loader, small_train_loader, big_test_loader, metanetwork,
                                                cfg.pruning, current_speed_up, log=log)
+        elif cfg.task_name == 'VGG19_on_CIFAR100':
+            metanetwork = torch.load(os.path.join(reproduce_dir, 'metanetwork.pth'))
+            speed_up, model = progressive_pruning(model, cfg.dataset.dataset_name, big_train_loader, 
+                                                big_test_loader, 2.0, log=log)
+            current_speed_up *= speed_up
+            train(model, small_train_loader, big_test_loader, 140, 0.01, "80, 120", log=log) 
+            model = pruning_one_step(model, cfg.model_name, cfg.dataset.dataset_name, info, model.state_dict(), 
+                                               big_train_loader, small_train_loader, big_test_loader, metanetwork,
+                                               cfg.pruning, current_speed_up, log=log)
             
     elif run == 'visualize_final':
         model = torch.load(os.path.join(reproduce_dir, 'model.pth'))
@@ -202,6 +212,12 @@ def main(cfg):
             model = resnet56(10)
             train(model, small_train_loader, big_test_loader, 200, 0.1, "100, 150, 180", log=log)
             torch.save(model, os.path.join(reproduce_dir, 'model.pth'))
+        elif cfg.task_name == 'VGG19_on_CIFAR100':
+            model = vgg19_bn(num_classes=100)
+            train(model, small_train_loader, big_test_loader, 200, 0.1, "100,150,180", log=log)
+            torch.save(model, os.path.join(reproduce_dir, 'model.pth'))
+        else:
+            raise ValueError(f"task {cfg.task_name} is not valid")
             
     elif run == 'test':
         model = resnet50(1000)
