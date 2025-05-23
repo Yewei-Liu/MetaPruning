@@ -11,31 +11,6 @@ from utils.logging import get_logger
 from utils.train import eval
 import os
 
-def visualize_subgraph(
-        edge_index : torch.tensor,
-        edge_features : torch.tensor, 
-        sub_nodes : list, 
-        node_index : list, 
-        title='tmp', 
-        save_path='tmp.png'
-                       ):
-    '''
-    draw subgraph
-    '''
-    
-    data = Data(edge_index=edge_index, edge_attr=edge_features, num_nodes=node_index[-1])
-    G = to_networkx(data, to_undirected=True, edge_attrs=["edge_attr"])
-    plt.figure(figsize=(80, 10))
-    pos = {i : [idx, i*3%5] for idx in range(len(node_index) - 1) for i in range(node_index[idx], node_index[idx + 1])}
-    nx.draw_networkx_nodes(G, pos, sub_nodes, node_color='skyblue', node_size=800)
-    edge_list = [tuple(edge.tolist()) for edge in edge_index.T if (edge[0].item() in sub_nodes and edge[1].item() in sub_nodes)]
-    nx.draw_networkx_edges(G, pos, edge_list, width=2, edge_color='green')
-    edge_labels = {tuple(edge.tolist()): f"{edge_features[i][4].item():.2f}" for i, edge in enumerate(edge_index.T) if (edge[0].item() in sub_nodes and edge[1].item() in sub_nodes)}
-    nx.draw_networkx_edge_labels(G, pos, edge_labels)
-    plt.title(title)
-    plt.savefig(save_path)
-
-
 def get_acc_speed_up_list(
         model,
         dataset_name, 
