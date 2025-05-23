@@ -7,17 +7,6 @@ from omegaconf import OmegaConf
 import os
 import collections
 
-import torch.multiprocessing as mp
-from torch.utils.data.distributed import DistributedSampler
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.distributed import destroy_process_group
-import torch_geometric
-import matplotlib.pyplot as plt
-import networkx as nx
-import torchvision.transforms as transforms
-from torch.func import functional_call
-import torchvision
-import torch_pruning as tp
 from generate_dataset.resnet_deep_family import resnet50
 
 from datasets import Dataset
@@ -176,7 +165,7 @@ def main(cfg):
                          big_test_loader, metanetwork, cfg.pruning, info['current_speed_up'], log=log)
 
     elif run == 'pruning_final':
-        model = torch.load(os.path.join(reproduce_dir, 'model.pth'))
+        model = torch.load(os.path.join(reproduce_dir, 'model.pth'), weights_only=False)
         if isinstance(model, collections.OrderedDict):
             model = state_dict_to_model(cfg.model_name, model)
         model.to(device)
@@ -187,7 +176,7 @@ def main(cfg):
         logging.info(f"Before pruning:\n{info}")
         cfg.pruning.pruning_index = pruning_index
         if cfg.task_name == 'resnet56_on_CIFAR10':
-            metanetwork = torch.load(os.path.join(reproduce_dir, 'metanetwork.pth'))
+            metanetwork = torch.load(os.path.join(reproduce_dir, 'metanetwork.pth'), weights_only=False)
             speed_up, model = progressive_pruning(model, cfg.dataset.dataset_name, big_train_loader, 
                                                 big_test_loader, 1.32, log=log)
             current_speed_up *= speed_up
@@ -196,7 +185,7 @@ def main(cfg):
                                                big_train_loader, small_train_loader, big_test_loader, metanetwork,
                                                cfg.pruning, current_speed_up, log=log)
         elif cfg.task_name == 'VGG19_on_CIFAR100':
-            metanetwork = torch.load(os.path.join(reproduce_dir, 'metanetwork.pth'))
+            metanetwork = torch.load(os.path.join(reproduce_dir, 'metanetwork.pth'), weights_only=False)
             speed_up, model = progressive_pruning(model, cfg.dataset.dataset_name, big_train_loader, 
                                                 big_test_loader, 2.0, log=log)
             current_speed_up *= speed_up
@@ -206,7 +195,7 @@ def main(cfg):
                                                cfg.pruning, current_speed_up, log=log)
             
     elif run == 'visualize_final':
-        model = torch.load(os.path.join(reproduce_dir, 'model.pth'))
+        model = torch.load(os.path.join(reproduce_dir, 'model.pth'), weights_only=False)
         model_list = [state_dict_to_model(cfg.model_name, model.state_dict())]
         model.to(device)
         train_acc, train_loss = eval(model, big_train_loader)
@@ -215,7 +204,7 @@ def main(cfg):
         info = {'train_acc': train_acc, 'train_loss': train_loss, 'val_acc': val_acc, 'val_loss': val_loss, 'current_speed_up': current_speed_up}
         logging.info(f"Before pruning:\n{info}")
         if cfg.task_name == 'resnet56_on_CIFAR10':
-            metanetwork = torch.load(os.path.join(reproduce_dir, 'metanetwork.pth'))
+            metanetwork = torch.load(os.path.join(reproduce_dir, 'metanetwork.pth'), weights_only=False)
             metanetwork.eval().to(device)
             speed_up, model = progressive_pruning(model, cfg.dataset.dataset_name, big_train_loader, 
                                                 big_test_loader, 1.32, log=log)
