@@ -118,6 +118,35 @@ def main(cfg):
             return new_model
         model_list = [model]
         label_list = ['origin']
+
+        # epoch_list = [50, 150]
+        # for i in range(len(epoch_list)):
+        #     def one_step():
+        #         metanetwork = load_metanetwork(index_list[i])
+        #         node_pred, edge_pred = metanetwork.forward(node_features.to(device), edge_index.to(device), edge_features.to(device))
+        #         new_model = graph_to_model(cfg.model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
+        #         train(new_model, small_train_loader, big_test_loader, epoch_list[i],
+        #             cfg.pruning.finetune.after_metanetwork.lr, f"{int(0.6*epoch_list[i])},{int(0.9*epoch_list[i])}",
+        #             cfg.pruning.finetune.after_metanetwork.lr_decay_gamma, cfg.pruning.finetune.after_metanetwork.weight_decay,
+        #             log=log, return_best=True, opt=cfg.pruning.opt)
+        #         model_list.append(new_model)
+        #         label_list.append(f'epoch_{index_list[i]} finetune_{epoch_list[i]}_epoch')
+        #     one_step()
+
+        # epoch_list = [0, 20, 50, 200]
+        # for i in range(len(epoch_list)):
+        #     def one_step():
+        #         metanetwork = load_metanetwork(index_list[0])
+        #         node_pred, edge_pred = metanetwork.forward(node_features.to(device), edge_index.to(device), edge_features.to(device))
+        #         new_model = graph_to_model(cfg.model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
+        #         train(new_model, small_train_loader, big_test_loader, epoch_list[i],
+        #             cfg.pruning.finetune.after_metanetwork.lr, f"{int(0.6*epoch_list[i])},{int(0.9*epoch_list[i])}",
+        #             cfg.pruning.finetune.after_metanetwork.lr_decay_gamma, cfg.pruning.finetune.after_metanetwork.weight_decay,
+        #             log=log, return_best=True, opt=cfg.pruning.opt)
+        #         model_list.append(new_model)
+        #         label_list.append(f'finetune_{epoch_list[i]}_epoch')
+        #     one_step()
+
         for index in index_list:
             metanetwork = load_metanetwork(index)
             new_model = get_new_model(metanetwork)
