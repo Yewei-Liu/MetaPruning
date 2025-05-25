@@ -27,6 +27,9 @@ main_imagenet/
 └── README.md                  # You are here!
 ```
 
+### Get dataset
+
+Download ImageNet dataset and set `data_path` in ['base.yaml'](configs/base.yaml) as the path to your ImageNet.
 
 ### Pruning
 
