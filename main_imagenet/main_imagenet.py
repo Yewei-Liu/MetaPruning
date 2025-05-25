@@ -17,7 +17,7 @@ import torch.utils.data
 import torchvision
 from torch import nn
 from torch.utils.data.dataloader import default_collate
-from torchvision.transforms.functional import InterpolationMode
+from torch.func import functional_call
 
 import torch_pruning as tp
 from functools import partial
@@ -25,6 +25,12 @@ from omegaconf import DictConfig, OmegaConf
 import hydra
 
 import matplotlib.pyplot as plt
+
+from utils.convert import state_dict_to_graph, graph_to_state_dict, state_dict_to_model, graph_to_model
+from utils.pruner import get_pruner
+from utils.pruning import progressive_pruning
+
+from generate_dataset.resnet_deep_family import resnet50
 
 
 def prune_to_target_flops(pruner, model, target_flops, example_inputs, cfg):
@@ -39,70 +45,8 @@ def prune_to_target_flops(pruner, model, target_flops, example_inputs, cfg):
     return pruned_ops
 
 
-def get_pruner(model, example_inputs, cfg):
-    unwrapped_parameters = (
-        [model.encoder.pos_embedding, model.class_token] if "vit" in cfg.model else None
-    )
-    sparsity_learning = False
-    data_dependency = False
-    if cfg.method == "random":
-        imp = tp.importance.RandomImportance()
-        pruner_entry = partial(tp.pruner.MagnitudePruner, global_pruning=cfg.global_pruning)
-    elif cfg.method == "l1":
-        imp = tp.importance.MagnitudeImportance(p=1)
-        pruner_entry = partial(tp.pruner.MagnitudePruner, global_pruning=cfg.global_pruning)
-    elif cfg.method == "lamp":
-        imp = tp.importance.LAMPImportance(p=2)
-        pruner_entry = partial(tp.pruner.MagnitudePruner, global_pruning=cfg.global_pruning)
-    elif cfg.method == "slim":
-        sparsity_learning = True
-        imp = tp.importance.BNScaleImportance()
-        pruner_entry = partial(tp.pruner.BNScalePruner, reg=cfg.reg, global_pruning=cfg.global_pruning)
-    elif cfg.method == "group_norm":
-        imp = tp.importance.GroupMagnitudeImportance(p=2)
-        pruner_entry = partial(tp.pruner.GroupNormPruner, global_pruning=cfg.global_pruning)
-    elif cfg.method == "group_greg":
-        sparsity_learning = True
-        imp = tp.importance.GroupMagnitudeImportance(p=2)
-        pruner_entry = partial(
-            tp.pruner.GrowingRegPruner,
-            reg=cfg.reg,
-            delta_reg=cfg.delta_reg,
-            global_pruning=cfg.global_pruning,
-        )
-    elif cfg.method == "group_sl":
-        sparsity_learning = True
-        imp = tp.importance.GroupMagnitudeImportance(p=2)
-        pruner_entry = partial(tp.pruner.GroupNormPruner, reg=cfg.reg, global_pruning=cfg.global_pruning)
-    else:
-        raise NotImplementedError
-    cfg.data_dependency = data_dependency
-    cfg.sparsity_learning = sparsity_learning
-    ignored_layers = []
-    pruning_ratio_dict = {}
-    for m in model.modules():
-        if isinstance(m, torch.nn.Linear) and m.out_features == 1000:
-            ignored_layers.append(m)
-    round_to = None
-    if "vit" in cfg.model:
-        round_to = model.encoder.layers[0].num_heads
-    pruner = pruner_entry(
-        model,
-        example_inputs,
-        importance=imp,
-        iterative_steps=100,
-        pruning_ratio=1.0,
-        pruning_ratio_dict=pruning_ratio_dict,
-        max_pruning_ratio=cfg.max_pruning_ratio,
-        ignored_layers=ignored_layers,
-        round_to=round_to,
-        unwrapped_parameters=unwrapped_parameters,
-    )
-    return pruner
-
-
 def train_one_epoch(
-    model, criterion, optimizer, data_loader, device, epoch, cfg, model_ema=None, scaler=None, pruner=None, recover=None
+    model, criterion, optimizer, data_loader, device, epoch, cfg, scaler=None, pruner=None, recover=None
 ):
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -136,11 +80,6 @@ def train_one_epoch(
                 nn.utils.clip_grad_norm_(model.parameters(), cfg.clip_grad_norm)
             optimizer.step()
 
-        if model_ema and i % cfg.model_ema_steps == 0:
-            model_ema.update_parameters(model)
-            if epoch < cfg.lr_warmup_epochs:
-                model_ema.n_averaged.fill_(0)
-
         acc1, acc5 = utils.accuracy(output, target, topk=(1, 5))
         batch_size = image.shape[0]
         metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
@@ -149,6 +88,98 @@ def train_one_epoch(
         metric_logger.meters["img/s"].update(batch_size / (time.time() - start_time))
     if pruner is not None and isinstance(pruner, tp.pruner.GrowingRegPruner):
         pruner.update_reg()
+
+
+def meta_train_one_epoch(
+    data_model_num, metanetwork, criterion, optimizer, big_data_loader, device, 
+    epoch, cfg_meta_train, cfg, model_name='resnet50'
+):
+    metanetwork.train()
+    index = cfg.rank % data_model_num
+    ckpt = torch.load(os.path.join('save', f'{cfg.name}', 'meta_train', 'data_model', f'{index}.pth'), weights_only=False, map_location=device)
+    origin_state_dict = ckpt['model']
+
+    node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, origin_state_dict)
+    model = state_dict_to_model(model_name, origin_state_dict, device)
+    pruner = get_pruner(model, torch.ones((1, 3, 224, 224)).to(device), cfg_meta_train.pruner_reg, "IMAGENET")
+
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1, fmt="{value}"))
+    metric_logger.add_meter("img/s", utils.SmoothedValue(window_size=10, fmt="{value}"))
+
+    header = f"Epoch: [{epoch}]"
+    state_dict = None
+    for i, (image, target) in enumerate(metric_logger.log_every(big_data_loader, cfg_meta_train.print_freq, header)):
+        def _one_step(i, image, target):
+            if i >= (len(big_data_loader) // cfg.meta_train.optimize_every_iter) * cfg.meta_train.optimize_every_iter:
+                return
+            start_time = time.time()
+            nonlocal state_dict
+            if i % cfg_meta_train.optimize_every_iter == 0:
+                node_pred, edge_pred = metanetwork.forward(node_features, edge_index, edge_features_list)
+                state_dict = graph_to_state_dict(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
+                optimizer.zero_grad()
+            image, target = image.to(device), target.to(device)
+            output = functional_call(model, state_dict, image)
+            loss = criterion(output, target)
+            loss.backward(retain_graph=True)
+            if (i + 1) % cfg_meta_train.optimize_every_iter == 0:
+                model.load_state_dict(state_dict)
+                for param in model.parameters():
+                    if param.requires_grad:
+                        param.grad = torch.zeros_like(param)
+                pruner.regularize(model)
+                big_tensor = []
+                big_gradient = []
+                for name, param in model.named_parameters():
+                    if param.requires_grad:
+                        if not torch.isnan(param.grad).any():
+                            big_tensor.append(state_dict[name].flatten())
+                            big_gradient.append(param.grad.flatten())
+                big_tensor = torch.cat(big_tensor, dim=0)
+                big_gradient = torch.cat(big_gradient, dim=0)
+                big_tensor.backward(gradient=big_gradient)
+            if (i + 1) % cfg_meta_train.optimize_every_iter == 0:
+                # if cfg_meta_train.clip_grad_norm != 0:
+                #     nn.utils.clip_grad_norm_(metanetwork.parameters(), cfg_meta_train.clip_grad_norm)
+                # max_grad = max(p.grad.abs().max() for p in metanetwork.parameters() if p.grad is not None)
+                # print(f"Max gradient: {max_grad.item()}")
+                # optimizer.step()
+
+
+                # Compute the total gradient norm BEFORE clipping
+                total_norm_before = torch.norm(
+                    torch.stack([torch.norm(p.grad.detach(), 2) for p in metanetwork.parameters() if p.grad is not None]), 
+                    2
+                )
+                if cfg_meta_train.clip_grad_norm != 0:
+                    # Clip gradients
+                    nn.utils.clip_grad_norm_(metanetwork.parameters(), cfg_meta_train.clip_grad_norm)
+                    
+                    # Compute the total gradient norm AFTER clipping
+                    total_norm_after = torch.norm(
+                        torch.stack([torch.norm(p.grad.detach(), 2) for p in metanetwork.parameters() if p.grad is not None]), 
+                        2
+                    )
+                    
+                    # Check if gradients were clipped
+                    if total_norm_after < total_norm_before:
+                        print(f"Gradients were CLIPPED (before: {total_norm_before:.4f}, after: {total_norm_after:.4f})")
+                    else:
+                        print(f"Gradients were NOT clipped (norm = {total_norm_before:.4f})")
+                
+                optimizer.step()
+
+            acc1, acc5 = utils.accuracy(output, target, topk=(1, 5))
+            batch_size = image.shape[0]
+            metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
+            metric_logger.meters["acc1"].update(acc1.item(), n=batch_size)
+            metric_logger.meters["acc5"].update(acc5.item(), n=batch_size)
+            metric_logger.meters["img/s"].update(batch_size / (time.time() - start_time))
+        _one_step(i, image, target)
+    del pruner
+
+    return metric_logger.loss.global_avg, metric_logger.acc1.global_avg, metric_logger.acc5.global_avg
 
 
 def evaluate(model, criterion, data_loader, device, print_freq=200, log_suffix=""):
@@ -242,9 +273,9 @@ def load_data(traindir, valdir, cfg):
 def train(
     model, 
     epochs, 
-    lr, lr_step_size, lr_warmup_epochs, 
+    lr, lr_warmup_epochs, 
     train_sampler, data_loader, data_loader_test, 
-    device, cfg, pruner=None, state_dict_only=True, recover=None):
+    device, cfg, pruner=None, state_dict_only=True, save_every_epoch=False):
 
     model.to(device)
     if cfg.distributed and cfg.sync_bn:
@@ -291,11 +322,14 @@ def train(
         raise RuntimeError(f"Invalid optimizer {cfg.opt}. Only SGD, RMSprop and AdamW are supported.")
 
     # scaler = torch.cuda.amp.GradScaler() if args.amp else None
-    scaler = torch.cuda.amp.GradScaler() if cfg.amp else None
+    scaler = torch.amp.GradScaler('cuda') if cfg.amp else None
 
     cfg.lr_scheduler = cfg.lr_scheduler.lower()
     if cfg.lr_scheduler == "steplr":
-        main_lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size, gamma=cfg.lr_gamma)
+        milestones = [int(ms) for ms in cfg.lr_decay_milestones.split(",")]
+        main_lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+            optimizer, milestones=milestones, gamma=cfg.lr_gamma
+        )
     elif cfg.lr_scheduler == "cosineannealinglr":
         main_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=epochs - lr_warmup_epochs, eta_min=cfg.lr_min
@@ -332,27 +366,21 @@ def train(
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.gpu])
         model_without_ddp = model.module
 
-    model_ema = None
-    if cfg.model_ema:
-        # Decay adjustment that aims to keep the decay independent from other hyper-parameters originally proposed at:
-        # https://github.com/facebookresearch/pycls/blob/f8cd9627/pycls/core/net.py#L123
-        #
-        # total_ema_updates = (Dataset_size / n_GPUs) * epochs / (batch_size_per_gpu * EMA_steps)
-        # We consider constant = Dataset_size for a given dataset/setup and ommit it. Thus:
-        # adjust = 1 / total_ema_updates ~= n_GPUs * batch_size_per_gpu * EMA_steps / epochs
-        adjust = cfg.world_size * cfg.batch_size * cfg.model_ema_steps / epochs
-        alpha = 1.0 - cfg.model_ema_decay
-        alpha = min(1.0, alpha * adjust)
-        model_ema = utils.ExponentialMovingAverage(model_without_ddp, device=device, decay=1.0 - alpha)
-
     if cfg.resume:
-        checkpoint = torch.load(cfg.resume, map_location="cpu")
+        print('resume from {}'.format(cfg.resume))
+        checkpoint = torch.load(cfg.resume, map_location="cpu", weights_only=False)
         model_without_ddp.load_state_dict(checkpoint["model"])
         optimizer.load_state_dict(checkpoint["optimizer"])
-        lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+        # lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+        milestones = [int(ms) for ms in cfg.lr_decay_milestones.split(",")]
+        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+            optimizer, milestones=milestones, gamma=cfg.lr_gamma
+        )
         cfg.start_epoch = checkpoint["epoch"] + 1
-        if model_ema:
-            model_ema.load_state_dict(checkpoint["model_ema"])
+        for i in range(cfg.start_epoch):
+            lr_scheduler.step()
         if scaler:
             scaler.load_state_dict(checkpoint["scaler"])
     
@@ -362,11 +390,9 @@ def train(
     for epoch in range(cfg.start_epoch, epochs):
         if cfg.distributed:
             train_sampler.set_epoch(epoch)
-        train_one_epoch(model, criterion, optimizer, data_loader, device, epoch, cfg, model_ema, scaler, pruner, recover=recover)
+        train_one_epoch(model, criterion, optimizer, data_loader, device, epoch, cfg, scaler, pruner)
         lr_scheduler.step()
-        acc = evaluate(model, criterion, data_loader_test, device=device)
-        if model_ema:
-            acc = evaluate(model_ema, criterion, data_loader_test, device=device, log_suffix="EMA")
+        acc, _ = evaluate(model, criterion, data_loader_test, device=device)
         if cfg.output_dir:
             checkpoint = {
                 "model": model_without_ddp.state_dict() if state_dict_only else model_without_ddp,
@@ -375,105 +401,87 @@ def train(
                 "epoch": epoch,
                 "args": cfg,
             }
-            if model_ema:
-                checkpoint["model_ema"] = model_ema.state_dict()
             if scaler:
                 checkpoint["scaler"] = scaler.state_dict()
             if acc>best_acc:
                 best_acc=acc
                 utils.save_on_master(checkpoint, os.path.join(cfg.output_dir, prefix+"best.pth"))
+            if save_every_epoch:
+                utils.save_on_master(checkpoint, os.path.join(cfg.output_dir, prefix+"epoch_{}.pth".format(epoch)))
             utils.save_on_master(checkpoint, os.path.join(cfg.output_dir, prefix+"latest.pth"))
         print("Epoch {}/{}, Current Best Acc = {:.6f}".format(epoch, epochs, best_acc))
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print(f"Training time {total_time_str}")
-    if cfg.distributed:
-        torch.distributed.destroy_process_group()
     return model_without_ddp
 
 
 def meta_train(
-    model, 
+    data_model_num,
+    metanetwork,
     epochs, 
-    lr, lr_step_size, lr_warmup_epochs, 
-    train_sampler, data_loader, data_loader_test, 
-    device, cfg, pruner=None, state_dict_only=True, recover=None):
+    lr, lr_warmup_epochs, 
+    train_sampler, big_data_loader, 
+    device, cfg_meta_train, cfg):
 
-    model.to(device)
-    if cfg.distributed and cfg.sync_bn:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
-    if cfg.label_smoothing>0:
-        criterion = nn.CrossEntropyLoss(label_smoothing=cfg.label_smoothing)
+    if cfg_meta_train.label_smoothing>0:
+        criterion = nn.CrossEntropyLoss(label_smoothing=cfg_meta_train.label_smoothing)
     else:
         criterion = nn.CrossEntropyLoss()
 
-    weight_decay = cfg.weight_decay if pruner is None else 0
-    bias_weight_decay = cfg.bias_weight_decay if pruner is None else 0
-    norm_weight_decay = cfg.norm_weight_decay if pruner is None else 0
+    weight_decay = cfg_meta_train.weight_decay 
 
-    custom_keys_weight_decay = []
-    if bias_weight_decay is not None:
-        custom_keys_weight_decay.append(("bias", bias_weight_decay))
-    if cfg.transformer_embedding_decay is not None:
-        for key in ["class_token", "position_embedding", "relative_position_bias_table"]:
-            custom_keys_weight_decay.append((key, cfg.transformer_embedding_decay))
-    parameters = utils.set_weight_decay(
-        model,
-        weight_decay,
-        norm_weight_decay=norm_weight_decay,
-        custom_keys_weight_decay=custom_keys_weight_decay if len(custom_keys_weight_decay) > 0 else None,
-    )
-
-    opt_name = cfg.opt.lower()
+    opt_name = cfg_meta_train.opt.lower()
     if opt_name.startswith("sgd"):
         optimizer = torch.optim.SGD(
-            parameters,
+            metanetwork.parameters(),
             lr=lr,
-            momentum=cfg.momentum,
+            momentum=cfg_meta_train.momentum,
             weight_decay=weight_decay,
             nesterov="nesterov" in opt_name,
         )
     elif opt_name == "rmsprop":
         optimizer = torch.optim.RMSprop(
-            parameters, lr=lr, momentum=cfg.momentum, weight_decay=weight_decay, eps=0.0316, alpha=0.9
+            metanetwork.parameters(), lr=lr, momentum=cfg_meta_train.momentum, weight_decay=weight_decay, eps=0.0316, alpha=0.9
         )
     elif opt_name == "adamw":
-        optimizer = torch.optim.AdamW(parameters, lr=lr, weight_decay=weight_decay)
+        optimizer = torch.optim.AdamW(metanetwork.parameters(), lr=lr, weight_decay=weight_decay)
     else:
-        raise RuntimeError(f"Invalid optimizer {cfg.opt}. Only SGD, RMSprop and AdamW are supported.")
+        raise RuntimeError(f"Invalid optimizer {cfg_meta_train.opt}. Only SGD, RMSprop and AdamW are supported.")
+    
 
-    # scaler = torch.cuda.amp.GradScaler() if args.amp else None
-    scaler = torch.cuda.amp.GradScaler() if cfg.amp else None
-
-    cfg.lr_scheduler = cfg.lr_scheduler.lower()
-    if cfg.lr_scheduler == "steplr":
-        main_lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size, gamma=cfg.lr_gamma)
-    elif cfg.lr_scheduler == "cosineannealinglr":
-        main_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=epochs - lr_warmup_epochs, eta_min=cfg.lr_min
+    cfg_meta_train.lr_scheduler = cfg_meta_train.lr_scheduler.lower()
+    if cfg_meta_train.lr_scheduler == "steplr":
+        milestones = [int(ms) for ms in cfg_meta_train.lr_decay_milestones.split(",")]
+        main_lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+            optimizer, milestones=milestones, gamma=cfg_meta_train.lr_gamma
         )
-    elif cfg.lr_scheduler == "exponentiallr":
-        main_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=cfg.lr_gamma)
+    elif cfg_meta_train.lr_scheduler == "cosineannealinglr":
+        main_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=epochs - lr_warmup_epochs, eta_min=cfg_meta_train.lr_min
+        )
+    elif cfg_meta_train.lr_scheduler == "exponentiallr":
+        main_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=cfg_meta_train.lr_gamma)
     else:
         raise RuntimeError(
-            f"Invalid lr scheduler '{cfg.lr_scheduler}'. Only StepLR, CosineAnnealingLR and ExponentialLR "
+            f"Invalid lr scheduler '{cfg_meta_train.lr_scheduler}'. Only StepLR, CosineAnnealingLR and ExponentialLR "
             "are supported."
         )
 
     if lr_warmup_epochs > 0:
-        if cfg.lr_warmup_method == "linear":
+        if cfg_meta_train.lr_warmup_method == "linear":
             warmup_lr_scheduler = torch.optim.lr_scheduler.LinearLR(
-                optimizer, start_factor=cfg.lr_warmup_decay, total_iters=lr_warmup_epochs
+                optimizer, start_factor=cfg_meta_train.lr_warmup_decay, total_iters=lr_warmup_epochs
             )
-        elif cfg.lr_warmup_method == "constant":
+        elif cfg_meta_train.lr_warmup_method == "constant":
             warmup_lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
-                optimizer, factor=cfg.lr_warmup_decay, total_iters=lr_warmup_epochs
+                optimizer, factor=cfg_meta_train.lr_warmup_decay, total_iters=lr_warmup_epochs
             )
         else:
             raise RuntimeError(
-                f"Invalid warmup lr method '{cfg.lr_warmup_method}'. Only linear and constant are supported."
+                f"Invalid warmup lr method '{cfg_meta_train.lr_warmup_method}'. Only linear and constant are supported."
             )
         lr_scheduler = torch.optim.lr_scheduler.SequentialLR(
             optimizer, schedulers=[warmup_lr_scheduler, main_lr_scheduler], milestones=[lr_warmup_epochs]
@@ -481,69 +489,50 @@ def meta_train(
     else:
         lr_scheduler = main_lr_scheduler
 
-    model_without_ddp = model
+    model_without_ddp = metanetwork
     if cfg.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.gpu])
-        model_without_ddp = model.module
-
-    model_ema = None
-    if cfg.model_ema:
-        # Decay adjustment that aims to keep the decay independent from other hyper-parameters originally proposed at:
-        # https://github.com/facebookresearch/pycls/blob/f8cd9627/pycls/core/net.py#L123
-        #
-        # total_ema_updates = (Dataset_size / n_GPUs) * epochs / (batch_size_per_gpu * EMA_steps)
-        # We consider constant = Dataset_size for a given dataset/setup and ommit it. Thus:
-        # adjust = 1 / total_ema_updates ~= n_GPUs * batch_size_per_gpu * EMA_steps / epochs
-        adjust = cfg.world_size * cfg.batch_size * cfg.model_ema_steps / epochs
-        alpha = 1.0 - cfg.model_ema_decay
-        alpha = min(1.0, alpha * adjust)
-        model_ema = utils.ExponentialMovingAverage(model_without_ddp, device=device, decay=1.0 - alpha)
+        metanetwork = torch.nn.parallel.DistributedDataParallel(metanetwork, device_ids=[cfg.gpu], static_graph=True, find_unused_parameters=True)
+        model_without_ddp = metanetwork.module
 
     if cfg.resume:
-        checkpoint = torch.load(cfg.resume, map_location="cpu")
-        model_without_ddp.load_state_dict(checkpoint["model"])
+        print('resume from {}'.format(cfg.resume))
+        checkpoint = torch.load(cfg.resume, map_location="cpu", weights_only=False)
+        model_without_ddp.load_state_dict(checkpoint["model"].state_dict())
         optimizer.load_state_dict(checkpoint["optimizer"])
-        lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+        # lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+        milestones = [int(ms) for ms in cfg_meta_train.lr_decay_milestones.split(",")]
+        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+            optimizer, milestones=milestones, gamma=cfg_meta_train.lr_gamma
+        )
         cfg.start_epoch = checkpoint["epoch"] + 1
-        if model_ema:
-            model_ema.load_state_dict(checkpoint["model_ema"])
-        if scaler:
-            scaler.load_state_dict(checkpoint["scaler"])
+        for i in range(cfg.start_epoch):
+            lr_scheduler.step()
     
     start_time = time.time()
-    best_acc = 0
-    prefix = '' if pruner is None else 'regularized_{:e}_'.format(cfg.reg)
     for epoch in range(cfg.start_epoch, epochs):
-        if cfg.distributed:
-            train_sampler.set_epoch(epoch)
-        train_one_epoch(model, criterion, optimizer, data_loader, device, epoch, cfg, model_ema, scaler, pruner, recover=recover)
-        lr_scheduler.step()
-        acc = evaluate(model, criterion, data_loader_test, device=device)
-        if model_ema:
-            acc = evaluate(model_ema, criterion, data_loader_test, device=device, log_suffix="EMA")
-        if cfg.output_dir:
-            checkpoint = {
-                "model": model_without_ddp.state_dict() if state_dict_only else model_without_ddp,
-                "optimizer": optimizer.state_dict(),
-                "lr_scheduler": lr_scheduler.state_dict(),
-                "epoch": epoch,
-                "args": cfg,
-            }
-            if model_ema:
-                checkpoint["model_ema"] = model_ema.state_dict()
-            if scaler:
-                checkpoint["scaler"] = scaler.state_dict()
-            if acc>best_acc:
-                best_acc=acc
-                utils.save_on_master(checkpoint, os.path.join(cfg.output_dir, prefix+"best.pth"))
-            utils.save_on_master(checkpoint, os.path.join(cfg.output_dir, prefix+"latest.pth"))
-        print("Epoch {}/{}, Current Best Acc = {:.6f}".format(epoch, epochs, best_acc))
+        def _one_epoch():
+            if cfg.distributed:
+                train_sampler.set_epoch(epoch)
+            train_loss, acc1, acc5 = meta_train_one_epoch(data_model_num, metanetwork, criterion, optimizer, big_data_loader, device,
+                                                        epoch, cfg_meta_train, cfg)
+            lr_scheduler.step()
+            if cfg.output_dir:
+                checkpoint = {
+                    "model": model_without_ddp,
+                    "optimizer": optimizer.state_dict(),
+                    "lr_scheduler": lr_scheduler.state_dict(),
+                    "epoch": epoch,
+                    "args": cfg,
+                }
+                utils.save_on_master(checkpoint, os.path.join('save', f'{cfg.name}', 'meta_train', 'metanetwork', f"epoch_{epoch}.pth"))
 
+            print("[Meta Training] Epoch: {}/{}, Train loss: {}, Acc1: {}, Acc5: {}".format(epoch, epochs, train_loss, acc1, acc5))
+        _one_epoch()
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print(f"Training time {total_time_str}")
-    if cfg.distributed:
-        torch.distributed.destroy_process_group()
     return model_without_ddp
 
 
@@ -560,6 +549,7 @@ def visualize_acc_speed_up_curve(
         save_dir ='tmp/',
         name = 'tmp.png',
         ylim = (0.0, 1.0),
+        font_scale = 1.5
 ):
     def get_acc_speed_up_list(
         model,
@@ -579,8 +569,8 @@ def visualize_acc_speed_up_curve(
         if cfg.distributed:
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.gpu])
             model_without_ddp = model.module
-        example_inputs = torch.ones((1, 3, 32, 32)).to(device)
-        pruner = get_pruner(model, example_inputs, cfg)
+        example_inputs = torch.randn(1, 3, 224, 224).to(device)
+        pruner = get_pruner(model, example_inputs, 0, "IMAGENET")
         base_ops, _ = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
         current_speed_up = 1.0
         acc1, acc5 = evaluate(model, criterion, test_loader, device)
@@ -596,36 +586,46 @@ def visualize_acc_speed_up_curve(
             acc5_list.append(acc5 / 100)
             speed_up_list.append(current_speed_up * base_speed_up)
         del pruner
-        if cfg.distributed:
-            torch.distributed.destroy_process_group()
         return acc1_list, acc5_list, speed_up_list
     
 
     os.makedirs(save_dir, exist_ok=True)
     print("Start visualizing")
+    plt.rcParams.update({
+        'font.size': 12 * font_scale,           # General font size
+        'axes.titlesize': 16 * font_scale,      # Title font size
+        'axes.labelsize': 14 * font_scale,      # X and Y labels font size
+        'xtick.labelsize': 12 * font_scale,     # X-axis tick labels
+        'ytick.labelsize': 12 * font_scale,      # Y-axis tick labels
+        'legend.fontsize': 12 * font_scale,      # Legend font size
+        'figure.titlesize': 18 * font_scale      # Figure title size
+    })
     plt.figure(figsize=(20, 20))
     if isinstance(models, list):
         assert isinstance(base_speed_up, list), 'if models are list, base_speed_up must be list !'
         for i, m in enumerate(models):
             acc1_list, acc5_list, speed_up_list = get_acc_speed_up_list(m, test_loader, base_speed_up[i], max_speed_up)
-            plt.plot(speed_up_list, acc1_list, marker=marker, label=f"{labels[i]}_acc1")
-            plt.plot(speed_up_list, acc5_list, marker=marker, label=f"{labels[i]}_acc5")
+            plt.plot(speed_up_list, acc1_list, marker=marker, label=f"{labels[i]}_acc1", markersize=4*font_scale, linewidth=2*font_scale)
+            plt.plot(speed_up_list, acc5_list, marker=marker, label=f"{labels[i]}_acc5", markersize=4*font_scale, linewidth=2*font_scale)
             print(f"Model {i+1}/{len(models)} visualized")
     else:
         acc1_list, acc5_list, speed_up_list = get_acc_speed_up_list(models, test_loader, base_speed_up, max_speed_up)
-        plt.plot(speed_up_list, acc1_list, marker=marker, label=f"{labels}_acc1")
-        plt.plot(speed_up_list, acc5_list, marker=marker, label=f"{labels}_acc5")
-    plt.xlabel('Speed Up')
-    plt.ylabel('Test Acc')
-    plt.title('Speed Up vs Test Acc')
+        plt.plot(speed_up_list, acc1_list, marker=marker, label=f"{labels}_acc1", markersize=4*font_scale, linewidth=2*font_scale)
+        plt.plot(speed_up_list, acc5_list, marker=marker, label=f"{labels}_acc5", markersize=4*font_scale, linewidth=2*font_scale)
+    plt.xlabel('Speed Up', fontsize=14 * font_scale)  # You can override individual elements if needed
+    plt.ylabel('Test Acc', fontsize=14 * font_scale)
+    plt.title('Test Acc vs. Speed Up', fontsize=16 * font_scale)
     plt.xlim(1.0, max_speed_up)
     plt.ylim(ylim)
-    plt.locator_params(axis='y', nbins=50)
+    plt.locator_params(axis='y', nbins=20)
     plt.grid()
-    plt.legend(loc='upper right')
-    plt.savefig(os.path.join(save_dir, name))
+    plt.legend(loc='upper right', prop={'size': 12 * font_scale})
+    plt.tick_params(axis='both', which='major', labelsize=12 * font_scale)
+    plt.savefig(os.path.join(save_dir, name), dpi=300, bbox_inches='tight')
     plt.close()  # Close the figure to free memory
     print("End visualizing") 
+
+
 
 
 
@@ -670,66 +670,55 @@ def main(cfg: DictConfig) -> None:
         pin_memory=True,
         collate_fn=collate_fn,
     )
+    big_data_loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=cfg.big_batch_size,
+        sampler=train_sampler,
+        num_workers=cfg.workers,
+        pin_memory=True,
+        collate_fn=collate_fn,
+    )
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=cfg.batch_size, sampler=test_sampler, num_workers=cfg.workers, pin_memory=True
     )
+  
+    if cfg.run == 'meta_train':
+        # model_name = 'resnet50'
+        # example_inputs = torch.randn(1, 3, 224, 224).to(device)
+        # base_model = registry.get_model(num_classes=1000, name=cfg.model, pretrained=cfg.pretrained, target_dataset='imagenet').to(device)
+        # base_ops, base_params = tp.utils.count_ops_and_params(base_model, example_inputs=example_inputs)
+        # del base_model
+        # print(cfg.data_model_num)
+        # for i in range(2, 3):
+        #     ckpt = torch.load(os.path.join('save', f'{cfg.name}', 'meta_train', 'data_model', f'{i}.pth'), weights_only=False, map_location=device)
+        #     model = state_dict_to_model(model_name, ckpt['model'], device)
+        #     pruned_ops, pruned_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
+        #     print(base_ops / pruned_ops)
+        # exit()
+        metanetwork_config = OmegaConf.select(cfg.metanetwork, str(cfg.level))
+        metanetwork = hydra.utils.instantiate(metanetwork_config).to(device)
+        cfg.resume = os.path.join('save', f'{cfg.name}', 'meta_train', 'metanetwork', f"epoch_9.pth")
+        metanetwork = meta_train(cfg.data_model_num, metanetwork, cfg.meta_train.epochs, cfg.meta_train.lr, 
+                                 cfg.meta_train.lr_warmup_epochs, train_sampler, big_data_loader, device, cfg.meta_train, cfg)
 
-    print("Creating model")
-    model = registry.get_model(num_classes=1000, name=cfg.model, pretrained=cfg.pretrained, target_dataset="imagenet")
-    model.eval()
-    print("="*16)
-    print(model)
-    example_inputs = torch.randn(1, 3, 224, 224)
-    base_ops, base_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
-    print("Params: {:.4f} M".format(base_params / 1e6))
-    print("Ops: {:.4f} G".format(base_ops / 1e9))
-    print("="*16)
 
-    if cfg.run == 'prune_sl':
-        pruner = get_pruner(model, example_inputs=example_inputs, cfg=cfg)
-        if cfg.sparsity_learning:
-            if cfg.sl_resume:
-                print("Loading sparse model from {}...".format(cfg.sl_resume))
-                model.load_state_dict(torch.load(cfg.sl_resume, map_location="cpu")["model"])
-            else:
-                print("Sparsifying model...")
-                sl_lr = cfg.sl_lr if cfg.sl_lr is not None else cfg.lr
-                sl_lr_step_size = cfg.sl_lr_step_size if cfg.sl_lr_step_size is not None else cfg.lr_step_size
-                sl_lr_warmup_epochs = cfg.sl_lr_warmup_epochs if cfg.sl_lr_warmup_epochs is not None else cfg.lr_warmup_epochs
-                sl_epochs = cfg.sl_epochs if cfg.sl_epochs is not None else cfg.epochs
-                train(
-                    model,
-                    sl_epochs,
-                    lr=sl_lr,
-                    lr_step_size=sl_lr_step_size,
-                    lr_warmup_epochs=sl_lr_warmup_epochs,
-                    train_sampler=train_sampler,
-                    data_loader=data_loader,
-                    data_loader_test=data_loader_test,
-                    device=device,
-                    cfg=cfg,
-                    pruner=pruner,
-                    state_dict_only=True,
-                )
-
-        model = model.to("cpu")
-        print("Pruning model...")
-        prune_to_target_flops(pruner, model, cfg.target_flops, example_inputs, cfg)
-        pruned_ops, pruned_size = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
-        print("="*16)
-        print("After pruning:")
+    elif cfg.run == 'prune': # no parallel
+        ckpt = torch.load(os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'train', 'latest.pth'), weights_only=False)
+        model = state_dict_to_model('resnet50', ckpt['model'])
+        speed_up, model = progressive_pruning(model, 'IMAGENET', data_loader, data_loader_test, cfg.speed_up, log=True, eval_train_data=False)
+        torch.save(model.state_dict(), os.path.join(cfg.output_dir, f'{speed_up:.4f}.pth'))
         print(model)
-        print("Params: {:.2f} M => {:.2f} M ({:.2f}%)".format(base_params / 1e6, pruned_size / 1e6, pruned_size / base_params * 100))
-        print("Ops: {:.2f} G => {:.2f} G ({:.2f}%, {:.2f}X )".format(base_ops / 1e9, pruned_ops / 1e9, pruned_ops / base_ops * 100, base_ops / pruned_ops))
-        print("="*16)
-
-        dataset, dataset_test, train_sampler, test_sampler = load_data(train_dir, val_dir, cfg)
-        print("Finetuning...")
+    
+    elif cfg.run == 'finetune': 
+        state_dict = torch.load(os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'prune', f'{cfg.speed_up:.4f}.pth'), map_location=device)
+        model = state_dict_to_model('resnet50', state_dict, device)
+        del state_dict
+        cfg.output_dir = os.path.join(cfg.output_dir, f'{cfg.speed_up:.4f}')
+        cfg.resume = os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'finetune', f'{cfg.speed_up:.4f}', 'epoch_40.pth')
         train(
             model,
             cfg.epochs,
             lr=cfg.lr,
-            lr_step_size=cfg.lr_step_size,
             lr_warmup_epochs=cfg.lr_warmup_epochs,
             train_sampler=train_sampler,
             data_loader=data_loader,
@@ -737,19 +726,87 @@ def main(cfg: DictConfig) -> None:
             device=device,
             cfg=cfg,
             pruner=None,
-            state_dict_only=False,
+            state_dict_only=True,
+            save_every_epoch=True,
         )
+
         
     elif cfg.run == 'visualize':
-        visualize_acc_speed_up_curve(model, 'pretrained', data_loader_test, 1.0, cfg, max_speed_up=5.0,
-                                     save_dir=cfg.output_dir, name='pretrained.png', ylim=(0.0, 1.0))        
+        savedir = os.path.join('save', f'{cfg.name}', 'visualize', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}')
+        print('save dir : ', savedir)
+        os.makedirs(savedir, exist_ok=True)
+        model_name = 'resnet50'
+        example_inputs = torch.randn(1, 3, 224, 224).to(device)
+        base_model = registry.get_model(num_classes=1000, name=cfg.model, pretrained=cfg.pretrained, target_dataset='imagenet').to(device)
+        base_ops, base_params = tp.utils.count_ops_and_params(base_model, example_inputs=example_inputs)
+        del base_model
 
-    elif cfg.run == 'train':
+        
+        ckpt = torch.load(os.path.join('save', f'{cfg.name}', 'meta_train', 'data_model', f'{cfg.index}.pth'), weights_only=False, map_location=device)
+        origin_state_dict = ckpt['model']
+        origin_model = state_dict_to_model(model_name, origin_state_dict, device)
+
+        if cfg.resume_epoch == -1:
+            metanetwork = torch.load(os.path.join('save', f'{cfg.name}', 'meta_train', 'metanetwork', f"epoch_{cfg.metanetwork_index}.pth"), weights_only=False, map_location=device)['model']
+            print(f'load metanetwork from {os.path.join("save", f"{cfg.name}", "meta_train", "metanetwork", f"epoch_{cfg.metanetwork_index}.pth")}')
+            node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, origin_state_dict, device)
+            node_pred, edge_pred = metanetwork.forward(node_features, edge_index, edge_features_list)
+            state_dict = graph_to_state_dict(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
+            model = state_dict_to_model('resnet50', state_dict, device)
+            del state_dict, node_index, node_features, edge_index, edge_features_list, node_pred, edge_pred
+            pruned_ops, pruned_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
+        else:
+            cfg.resume = os.path.join('save', f'{cfg.name}', 'visualize', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}', f'epoch_{cfg.resume_epoch}.pth')
+            ckpt = torch.load(cfg.resume, weights_only=False, map_location=device)
+            model = state_dict_to_model('resnet50', ckpt['model'], device)
+            pruned_ops, pruned_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
+
+
+        print(f"Origin speed up : {base_ops / pruned_ops}")
+        cfg.output_dir = savedir
+        cfg.lr_decay_milestones = "120,160,185"
+        model = train(model, 200, 0.01, 0, train_sampler, data_loader, data_loader_test, device, cfg, pruner=None, state_dict_only=True, save_every_epoch=True)
+        
+        model_list = [model, origin_model]
+        label_list = ['after metanetwork', 'origin']
+        speed_up_list = [base_ops / pruned_ops, base_ops / pruned_ops]
+        visualize_acc_speed_up_curve(model_list, label_list, data_loader_test, speed_up_list, cfg, max_speed_up=2.5,
+                                     save_dir=savedir, name=f'visualize.png', ylim=(0.6, 1.0))   
+            
+
+    elif cfg.run == 'prune_after_metanetwork':
+        savedir = os.path.join('save', f'{cfg.name}', 'prune_after_metanetwork', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}', f'{cfg.speed_up:.4f}')
+        print('save dir : ', savedir)
+        os.makedirs(savedir, exist_ok=True)
+        model_name = 'resnet50'
+        if cfg.resume_epoch == -1:
+            example_inputs = torch.randn(1, 3, 224, 224).to(device)
+            base_model = registry.get_model(num_classes=1000, name=cfg.model, pretrained=cfg.pretrained, target_dataset='imagenet').to(device)
+            base_ops, base_params = tp.utils.count_ops_and_params(base_model, example_inputs=example_inputs)
+            del base_model
+            ckpt = torch.load(os.path.join('save', f'{cfg.name}', 'visualize', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}', 'best.pth'), weights_only=False, map_location=device)
+            model = state_dict_to_model(model_name, ckpt['model'], device)
+            pruned_ops, pruned_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
+            current_speed_up = float(base_ops) / pruned_ops
+            print(f'Origin speed up : {current_speed_up}')
+            speed_up, model = progressive_pruning(model, 'IMAGENET', data_loader, data_loader_test, cfg.speed_up / current_speed_up, log=True, eval_train_data=False, eval_test_data=False)
+            current_speed_up *= speed_up
+            print(f"Current speed up : {current_speed_up}")
+        else:
+            ckpt = torch.load(os.path.join('save', f'{cfg.name}', 'prune_after_metanetwork', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}', f'{cfg.speed_up}', f'epoch_{cfg.resume_epoch}.pth'), weights_only=False, map_location=device)
+            model = state_dict_to_model(model_name, ckpt['model'], device)
+            cfg.resume = os.path.join('save', f'{cfg.name}', 'prune_after_metanetwork', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}', f'{cfg.speed_up}', f'epoch_{cfg.resume_epoch}.pth')
+
+        cfg.lr_decay_milestones = "120,160,185"
+        cfg.output_dir = savedir
+        model = train(model, 200, 0.01, 0, train_sampler, data_loader, data_loader_test, device, cfg, pruner=None, state_dict_only=True, save_every_epoch=True)
+
+
+    elif cfg.run == 'train_from_scratch':
         train(
             model,
             cfg.epochs,
             lr=cfg.lr,
-            lr_step_size=cfg.lr_step_size,
             lr_warmup_epochs=cfg.lr_warmup_epochs,
             train_sampler=train_sampler,
             data_loader=data_loader,
@@ -773,7 +830,7 @@ def main(cfg: DictConfig) -> None:
             criterion = nn.CrossEntropyLoss()
 
         # scaler = torch.cuda.amp.GradScaler() if args.amp else None
-        scaler = torch.cuda.amp.GradScaler() if cfg.amp else None
+        scaler = torch.amp.GradScaler('cuda') if cfg.amp else None
         model_without_ddp = model
         if cfg.distributed:
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.gpu])
@@ -787,13 +844,12 @@ def main(cfg: DictConfig) -> None:
         torch.backends.cudnn.deterministic = True
         evaluate(model, criterion, data_loader_test, device=device)
 
-        if cfg.distributed:
-            torch.distributed.destroy_process_group()
-
-
 
     else:
         raise ValueError(f"Run type {cfg.run} not supported.")
+
+    if cfg.distributed:
+        torch.distributed.destroy_process_group()
 
 if __name__ == "__main__":
     main()
