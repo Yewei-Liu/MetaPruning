@@ -10,17 +10,32 @@
 
 This repository contains the codes for our paper. We implemented the 3 experimenets in our paper (pruning ResNet56 on CIFAR10, VGG10 on CIFAR100, ResNet50 on ImageNet). You can also easily add other experiments based on our framework.
 
-We have referenced the [Depgraph](https://github.com/VainF/Torch-Pruning) and [NGGNN](https://github.com/mkofinas/neural-graphs) codebases in part for our implementation. Thanks 😊.
+We have referenced the [Depgraph](https://github.com/VainF/Torch-Pruning) codebase in part for our implementation. Thanks 😊.
 
 ---
 
-## 🚀 Reproduce
+## 🚀 Getting Started
 
-### Generate Data Models
+- git clone or download our code
+- create the conda env
+```bash
+conda create -n MetaPruning python=3.9 -y
+conda activate MetaPruning
+conda install pytorch==2.0.1 torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia -y
+conda install pyg==2.3.0 pytorch-scatter -c pyg -y
+pip install hydra-core einops opencv-python 
+pip install torch-pruning 
+pip install datasets 
+pip install importlib_metadata
+pip install termcolor
+pip install h5py
+```
 
-Use ['generate_dataset'](generate_dataset/) to generate data models for meta-training.
-
-
+- install our package
+```bash
+cd MetaPruning
+pip install -e .
+```
 
 ---
 

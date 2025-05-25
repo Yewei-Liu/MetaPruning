@@ -52,7 +52,7 @@ You can also do our experiments from scratch, generate data models, meta-train m
 
 ### Generate data models
 
-Follow [README.md](../generate_dataset/README.md) to generate data models for the following meta-training.
+Follow [generate_dataset/README.md](../generate_dataset/README.md) to generate data models for the following meta-training.
 
 ### Meta-Training
 

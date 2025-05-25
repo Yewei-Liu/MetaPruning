@@ -9,9 +9,6 @@ import collections
 
 from generate_dataset.resnet_deep_family import resnet50
 
-from datasets import Dataset
-from utils.logging import get_logger
-from utils.visualize import visualize_subgraph
 from utils.convert import graph_to_state_dict, state_dict_to_model, state_dict_to_graph, graph_to_model
 from generate_dataset.resnet_family import resnet56, MyResNet
 from generate_dataset.VGG_family import vgg19_bn, MyVGG
@@ -69,7 +66,10 @@ def main(cfg):
     cfg = cfg.task
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_train_loader, model_val_loader = get_dataset_model_loader(cfg.dataset_model)
+    try:
+        model_train_loader, model_val_loader = get_dataset_model_loader(cfg.dataset_model)
+    except:
+        print('No dataset models exist, just for quick reproduce.')
     big_train_loader, big_test_loader = get_dataset_loader(cfg.big_batch_dataset)
     small_train_loader, small_test_loader = get_dataset_loader(cfg.small_batch_dataset)
 
