@@ -14,4 +14,4 @@ You can download our pretrained metanetworks and models to quickly reproduce the
 
 ### Download pretrained models
 
-download the **download.zip** from [Latest Release](https://github.com/username/repo/releases/latest) and unzip it.
+download the **download.zip** from [Latest Release](https://github.com/Yewei-Liu/MetaPruning/releases/latest) and unzip it.
