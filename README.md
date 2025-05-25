@@ -21,8 +21,9 @@ We have referenced the [Depgraph](https://github.com/VainF/Torch-Pruning) and [N
 ```bash
 conda create -n MetaPruning python=3.9 -y
 conda activate MetaPruning
-conda install pytorch==2.0.1 torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia -y
+conda install pytorch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1  pytorch-cuda=11.8 -c pytorch -c nvidia -y
 conda install pyg==2.3.0 pytorch-scatter -c pyg -y
+pip install torch_geometric==2.3.0
 pip install hydra-core einops opencv-python 
 pip install torch-pruning 
 pip install datasets 
