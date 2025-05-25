@@ -15,5 +15,5 @@ main_imagenet/*.txt
 main_imagenet/outputs/**
 main_imagenet/save/**
 __pycache__/
-*/nohup.out
+nohup.out
 *.egg-info
