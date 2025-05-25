@@ -3,6 +3,7 @@ import hydra
 from omegaconf import OmegaConf
 from datasets import Dataset
 from utils.logging import get_logger
+import os
 
 @hydra.main(config_path="configs", config_name="base", version_base=None)
 def main(cfg):
@@ -11,6 +12,7 @@ def main(cfg):
     logger.info(f"Config:\n{OmegaConf.to_yaml(cfg)}")
     hydra_cfg = hydra.core.hydra_config.HydraConfig.get()
     
+    os.makedirs(cfg.save_path, exist_ok=True)
     data_generator = hydra.utils.instantiate(cfg.generator)
     start_time = time.time()
     dataset = Dataset.from_generator(data_generator, cache_dir=cfg.cache_path)
