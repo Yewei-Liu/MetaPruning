@@ -5,6 +5,7 @@ generate_dataset/.cache/**
 generate_dataset/outputs/**
 
 *.txt
+!requirement.txt
 
 final/
 History/
