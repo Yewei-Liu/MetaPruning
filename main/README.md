@@ -56,4 +56,19 @@ Follow [generate_dataset/README.md](../generate_dataset/README.md) to generate d
 
 ### Meta-Training
 
+First we need to under several configs of meta-training.
+
+In ['configs/base.yaml'](configs/base.yaml) :
+- `run` : running mode, for meta-training we set it to `meta_train`.
+- `name` : name for save and output, choose a name you like.
+- `task` : choose task to run, `resnet56_on_CIFAR10` or `VGG19_on_CIFAR100`.
+
+We take resnet56_on_CIFAR10 as example, in ['configs/task/resnet56_on_CIFAR10.yaml'](configs/task/resnet56_on_CIFAR10.yaml) :
+- `meta_train` : set hyperparameters like epochs and lr for meta-training.
+- `metanetwork` : set the size and res coefficient of metanetwork
+
+To meta_train, run:
+```bash
+python main.py run=meta_train task=resnet56_on_CIFAR10 name=Test 
+```
 

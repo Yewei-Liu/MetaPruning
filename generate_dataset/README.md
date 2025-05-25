@@ -29,7 +29,7 @@ Then wait until it finish.
 
 Run :
 ```bash
-python merge.py data_generator=resnet56_on_CIFAR10
+python merge_dataset.py data_generator=resnet56_on_CIFAR10
 ```
 Then type in the number of your small datasets (3 here)
 
@@ -37,4 +37,4 @@ Then type in the number of your small datasets (3 here)
 
 ## Clean
 
-Each time before you generate new data models, use `sh clean.sh` to clean the cache and useless files. **must do this or it will directly use .cache instead of generating new datasets**
+Each time before you generate new data models, use `sh clean.sh` to clean the cache and useless files. **(must do this or it will directly use .cache instead of generating new datasets)**
