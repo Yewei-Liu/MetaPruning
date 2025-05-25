@@ -10,8 +10,50 @@ This directory includes codes for our method on small datasets without parallel 
 
 ## 🚀 Quick Reproduce
 
-You can download our pretrained metanetworks and models to quickly reproduce the experiments in our paper.
+You can download our pretrained metanetworks and models to quickly reproduce the experiments in our paper. (This is the abbreviated version of our experiments)
 
 ### Download pretrained models
 
-download the **download.zip** from [Latest Release](https://github.com/Yewei-Liu/MetaPruning/releases/latest) and unzip it.
+download the `download.zip` from [Latest Release](https://github.com/Yewei-Liu/MetaPruning/releases/latest) and unzip it. 
+
+Then create a `final` directory and move `resnet56_on_CIFAR10` and `VGG19_on_CIFAR100` from your download to it in a way like this.
+
+```
+main/
+├── final/      
+│    ├── resnet56_on_CIFAR10
+│    └── VGG19_on_CIFAR100
+└── README.md                  # You are here!
+```
+
+Each file like `resnet56_on_CIFAR10/reproduce_0` contains a metanetwork for pruning and a model to be pruned. You can change `reproduce_0` to `reproduce_{k}` and setting `reproduce_index` to the corresponding `k` during pruning.
+
+### Pruning
+
+See ['scripts'](scripts/resnet56_on_CIFAR10.sh) to choose your scripts for pruning.
+
+In each script : 
+```bash
+python main.py task=resnet56_on_CIFAR10 name=Final run=pruning_final reproduce_index=0 seed=7 index=2.3
+```
+You can Change:
+- `task` : Specify which task to run. `resnet56_on_CIFAR10` or `VGG19_on_CIFAR100`.
+- `name` : Set the name of output file.
+- `reproduce_index` : Corresponding to your `reproduce_{k}` file name like mentioned above.
+- `seed` : Set seed for reproduce.
+- `index` : Pruning to a speed up larger than this value.
+
+---
+
+
+## ✈️ Full reproduce
+
+You can also do our experiments from scratch, generate data models, meta-train metanetworks and select the proper metanetwork for pruning. (This is the complete version of our experiments)
+
+### Generate data models
+
+Follow [README.md](../generate_dataset/README.md) to generate data models for the following meta-training.
+
+### Meta-Training
+
+
