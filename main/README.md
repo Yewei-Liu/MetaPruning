@@ -8,4 +8,10 @@ This directory includes codes for our method on small datasets without parallel 
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quick Reproduce
+
+You can download our pretrained metanetworks and models to quickly reproduce the experiments in our paper.
+
+### Download pretrained models
+
+download the **download.zip** from [Latest Release](https://github.com/username/repo/releases/latest) and unzip it.
