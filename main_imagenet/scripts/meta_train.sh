@@ -2,7 +2,7 @@
 
 DATA_MODEL_NUM=2
 RUN_TYPE="meta_train"     
-NAME=Maybe  # "Ame"
+NAME=Final 
 
 NUM_GPUS=8                     
 MASTER_PORT=18900             

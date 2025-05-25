@@ -1,10 +1,10 @@
 #!/bin/bash
 
 INDEX=2
-METANETWORK_INDEX=14
+METANETWORK_INDEX=13
 RUN_TYPE="prune_after_metanetwork"                
-NAME=Maybe  # "Ame"
-SPEED_UP=2.5001
+NAME=Final 
+SPEED_UP=2.3095
 RESUME_EPOCH=-1
 
 NUM_GPUS=8                     

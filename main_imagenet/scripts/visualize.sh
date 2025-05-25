@@ -3,8 +3,8 @@
 INDEX=2
 METANETWORK_INDEX=13
 RUN_TYPE="visualize"                
-NAME=Maybe  # "Ame"
-RESUME_EPOCH=199
+NAME=Final 
+RESUME_EPOCH=-1
 
 NUM_GPUS=8                     
 MASTER_PORT=18900             

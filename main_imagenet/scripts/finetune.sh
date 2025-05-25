@@ -2,7 +2,7 @@
 
 INDEX=2
 RUN_TYPE="finetune"                 
-NAME=Maybe  # "Ame"
+NAME=Final
 EPOCHS=60
 LR=0.01
 LR_DECAY_MILESTOMES=\'30\'

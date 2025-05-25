@@ -16,37 +16,51 @@ You can download our pretrained metanetworks and models to quickly reproduce the
 
 download the `download.zip` from [Latest Release](https://github.com/Yewei-Liu/MetaPruning/releases/latest) and unzip it. 
 
-Then create a `final` directory and move `resnet56_on_CIFAR10` and `VGG19_on_CIFAR100` from your download to it in a way like this.
+Then create a `save/Final` directory and move `resnet50_on_ImageNet/meta_train/` from your download to it in a way like this.
 
 ```
-main/
-├── final/      
-│    ├── resnet56_on_CIFAR10
-│    └── VGG19_on_CIFAR100
+main_imagenet/
+├── save/
+│    ├── Final/
+│    │    └── meta_train/
+│    └── ...
 └── README.md                  # You are here!
 ```
 
-Each file like `resnet56_on_CIFAR10/reproduce_0` contains a metanetwork for pruning and a model to be pruned. You can change `reproduce_0` to `reproduce_{k}` and setting `reproduce_index` to the corresponding `k` during pruning.
 
 ### Pruning
 
-See ['scripts'](scripts/resnet56_on_CIFAR10.sh) to choose your scripts for pruning.
+We have 3 data models. Among them, 0 and 1 are used for meta-training, and 2 is used for pruning.
 
-In each script : 
+We first feedforward data model 2 through our metanetwork, finetune and visualize the "Test Acc VS. Speed Up" curve by running
 ```bash
-python main.py task=resnet56_on_CIFAR10 name=Final run=pruning_final reproduce_index=0 seed=7 index=2.3
+sh scripts/visualize.sh
 ```
-You can Change:
-- `task` : Specify which task to run. `resnet56_on_CIFAR10` or `VGG19_on_CIFAR100`.
-- `name` : Set the name of output file.
-- `reproduce_index` : Corresponding to your `reproduce_{k}` file name like mentioned above.
-- `seed` : Set seed for reproduce.
-- `index` : Pruning to a speed up larger than this value.
+
+Hyperparameters of `visualize.sh` is as follows
+- `INDEX=2` : Use data model with index 2.
+- `METANETWORK_INDEX=13` : Use metanetwork from epoch 13 in meta-training.
+- `RUN_TYPE="visualize"` : Set running type to visualize.               
+- `NAME=Final ` : A name for read data models and output.
+- `RESUME_EPOCH=-1` : Resume from a previously saved checkpoint. For example, if finetuning completed epoch 5 before the process was interrupted, you can set this value to 5 to continue training at epoch 6. By default, this is set to -1, which means training will start from the beginning.
+
+Then we continue to prune and finetune this network by running:
+```bash
+sh scripts/prune_after_metanetwork.sh
+```
+
+Hyperparameters of `prune_after_metanetwork.sh` is as follows
+- `INDEX=2` : Use data model with index 2.
+- `METANETWORK_INDEX=13` : Use metanetwork from epoch 13 in meta-training.
+- `RUN_TYPE="prune_after_metanetwork"` : Set running type to prune after metanetwork.               
+- `NAME=Final ` : A name for read data models and output.
+- `SPEED_UP=2.3095` : The final target speed up, pruning to a speed up a little bit larger than this.
+- `RESUME_EPOCH=-1` : Resume from a previously saved checkpoint. For example, if finetuning completed epoch 5 before the process was interrupted, you can set this value to 5 to continue training at epoch 6. By default, this is set to -1, which means training will start from the beginning.
 
 ---
 
 
-## ✈️ Full reproduce
+<!-- ## ✈️ Full reproduce
 
 You can also do our experiments from scratch, generate data models, meta-train metanetworks and select the proper metanetwork for pruning. (This is the complete version of our experiments)
 
@@ -133,7 +147,7 @@ Finally, if we want to pruning with speed up 2.5x, we can run :
 ```bash
 python main.py task=resnet56_on_CIFAR10 run=pruning_final name=Test reproduce_index=3 index=2.5
 ```
-
+ -->
 
 
 

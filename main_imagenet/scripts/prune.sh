@@ -3,7 +3,7 @@
 INDEX=2
 RUN_TYPE="prune"               
 SPEED_UP=1.2920
-NAME=Maybe  # "Ame"
+NAME=Final 
 PRETRAINED=True
 DEVICE=7                   
 CONFIG_NAME="base"              
