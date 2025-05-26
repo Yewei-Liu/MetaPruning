@@ -6,6 +6,7 @@ import torch_pruning as tp
 dataset_num_classes_dict = {
     'CIFAR10': 10,
     'CIFAR100': 100,
+    'IMAGENET': 1000
 }
 
 
@@ -23,8 +24,6 @@ def get_pruner(model,
     elif method == "group_sl":
         imp = tp.importance.GroupMagnitudeImportance(p=2, normalizer='max') # normalized by the maximum score for CIFAR
         pruner_entry = partial(tp.pruner.GroupNormPruner, reg=reg, global_pruning=global_pruning)
-    else:
-        raise NotImplementedError(f"Method {method} is not a valid method.")
     #args.is_accum_importance = is_accum_importance
     unwrapped_parameters = []
     ignored_layers = []
