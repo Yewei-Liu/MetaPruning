@@ -67,6 +67,8 @@ We take `resnet56_on_CIFAR10` as example, in ['configs/task/resnet56_on_CIFAR10.
 - `meta_train` : set hyperparameters like epochs and lr for meta-training.
 - `metanetwork` : set the size and res coefficient of metanetwork
 
+For better performance, you can search for a reasonable `lr_decay_milestone` first. See Appendix A.2 in our paper.
+
 To meta_train, run:
 ```bash
 python main.py run=meta_train task=resnet56_on_CIFAR10 name=Test 
