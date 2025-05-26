@@ -50,6 +50,7 @@ def main(cfg):
         if cfg.index == 'train':
             raise ValueError("must use : python main.py run=pretrain_final index=<reproduce_index>")
         reproduce_dir = os.path.join('final', cfg.task.task_name, f'reproduce_{cfg.index}')
+        os.makedirs(reproduce_dir, exist_ok=True)
     elif cfg.run == 'test':
         if cfg.index == 'train':
             raise ValueError("must use : python main.py run=pretrain_final index=<reproduce_index>")
