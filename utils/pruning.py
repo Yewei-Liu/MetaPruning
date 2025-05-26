@@ -19,12 +19,18 @@ def progressive_pruning(
         method = 'group_sl',
         log=False, 
         device=None,
-
+        eval_train_data=True,
+        eval_test_data=True,
 ):
     if device is None:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model.eval().to(device)
-    example_inputs = torch.ones((1, 3, 32, 32)).to(device)
+    if dataset_name.lower() in ['cifar10', 'cifar100']:
+        example_inputs = torch.ones((1, 3, 32, 32)).to(device)
+    elif dataset_name.lower() in ['imagenet']:
+        example_inputs = torch.ones((1, 3, 224, 224)).to(device)
+    else:
+        raise NotImplementedError(f"Dataset {dataset_name} is not supported.")
     pruner = get_pruner(model, example_inputs, 0.1, dataset_name, method=method)
     base_ops, _ = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
     current_speed_up = 1.0
@@ -37,15 +43,21 @@ def progressive_pruning(
         if pruner.current_step == pruner.iterative_steps:
             break
     del pruner
-    train_acc, train_loss = eval(model, train_loader, device=device)
-    val_acc, val_loss = eval(model, test_loader, device=device)
+    if eval_train_data:
+        train_acc, train_loss = eval(model, train_loader, device=device)
+    if eval_test_data:
+        val_acc, val_loss = eval(model, test_loader, device=device)
     if log:
-        logger.info(f"Train acc : {train_acc}   Val acc : {val_acc}")
+        if eval_train_data:
+            logger.info(f'Train acc : {train_acc}')
+        if eval_test_data:
+            logger.info(f"Val acc : {val_acc}")
         logger.info(f"Current speed up: {current_speed_up:.2f}")
     return current_speed_up, model
 
 
 def adaptive_pruning(
+        
         model, 
         model_name,
         dataset_name,
