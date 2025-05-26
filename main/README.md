@@ -115,7 +115,7 @@ main/
 └── README.md               # You are here!
 ```
 
-Assuming we use metanetwork at epoch 28 for final pruning, we should copy `epoch_28.pth` from `save/metanetwork/resnet56_on_CIFAR10/Test/level_0/epoch_28.pth` to `final/resnet56_on_CIFAR10/reproduce_3` and rename it as `metanetwork.pth`. So the final directory should look like :
+Assuming we use metanetwork at epoch 28 for final pruning, we should copy `epoch_28.pth` from `save/metanetwork/resnet56_on_CIFAR10/Test/level_0/epoch_28.pth` to `final/resnet56_on_CIFAR10/reproduce_3/` and rename it as `metanetwork.pth`. So the final directory should look like :
 
 ```
 main/
