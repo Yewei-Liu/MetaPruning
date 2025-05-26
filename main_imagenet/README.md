@@ -75,11 +75,11 @@ sh scripts/train_from_scratch.sh
 ```
 You can modify `NAME` to choose a unique name you like (this name must be the same in one experiment). `INDEX` means the index for your data models. For example, if you want to generate 3 data models, you should run `sh scripts/train_from_scratch.sh` 3 times with `INDEX` 0, 1, 2 respectively while keeping all other hyperparameters the same.
 
-Then to do initial pruning and finetuning, you can change the `NAME` and `INDEX` in `prune.sh` and `finetune.sh` and run:
+Then to do initial pruning and finetuning, you can change `NAME` and `INDEX` in `prune.sh` in the same way and run:
 ```bash
 sh scripts/prune.sh
 ```
-After finished, run :
+After finished, change `NAME` and `INDEX` in `finetune.sh` in the same way and run :
 ```bash
 sh scripts/finetune.sh 
 ```
