@@ -106,5 +106,5 @@ We prune by run :
 ```bash
 sh scripts/prune_after_metanetwork.sh
 ```
-Before running, remember to set the `INDEX`, `METANETWORK_INDEX`, `NAME`, `SPEED_UP`
+Before running, make sure to set the hyperparameters `INDEX`, `METANETWORK_INDEX`, `NAME`, and `SPEED_UP`. This time, both `INDEX` and `METANETWORK_INDEX` must be used during visualization. This is because pruning depends on the results from the visualization step — specifically, the feedforward through the metanetwork and subsequent finetuning. Therefore, if you want to prune a particular combination of `INDEX` and `METANETWORK_INDEX` that hasn't been visualized yet, you should visualize it first.
 
