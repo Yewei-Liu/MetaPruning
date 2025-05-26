@@ -1,8 +1,8 @@
 # 📄 Meta Pruning via Graph Metanetworks : A Meta Learning Framework for Network Pruning
 
-![Meta Training pipeline](figures/Meta_training_pipeline.pdf)
+![Meta Training pipeline](figures/meta_training_pipeline.png)
 
-**[Insert title here]**  
+**[Basic info]**  
 *Authors: [Yewei Liu], [Xiyuan Wang], [Muhan Zhang]*  
 <!-- *Conference/Journal: [e.g., NeurIPS 2025, arXiv preprint]*  
 *ArXiv Link: [insert link]*  
