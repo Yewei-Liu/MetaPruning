@@ -8,7 +8,7 @@ This directory includes codes for our method on large datasets with parallel (pr
 
 ---
 
-## 🚀 Quick Reproduce
+## 🚀 Quick Reproduce 
 
 You can download our pretrained metanetworks and models to quickly reproduce the experiments in our paper. (This is the abbreviated version of our experiments)
 
@@ -63,94 +63,48 @@ Hyperparameters of `prune_after_metanetwork.sh` is as follows
 ---
 
 
-<!-- ## ✈️ Full reproduce
+## ✈️ Full reproduce
 
 You can also do our experiments from scratch, generate data models, meta-train metanetworks and select the proper metanetwork for pruning. (This is the complete version of our experiments)
 
 ### Generate data models
 
-Follow [generate_dataset/README.md](../generate_dataset/README.md) to generate data models for the following meta-training.
+We generate data models by finetuning the pytorch pretrained model by running :
+```bash
+sh scripts/train_from_scratch.sh
+```
+You can modify `NAME` to choose a unique name you like (this name must be the same in one experiment). `INDEX` means the index for your data models. For example, if you want to generate 3 data models, you should run `sh scripts/train_from_scratch.sh` 3 times with `INDEX` 0, 1, 2 respectively while keeping all other hyperparameters the same.
+
+Then to do initial pruning and finetuning, you can change the `NAME` and `INDEX` in `prune.sh` and `finetune.sh` and run:
+```bash
+sh scripts/prune.sh
+```
+After finished, run :
+```bash
+sh scripts/finetune.sh 
+```
 
 ### Meta-Training
 
-First we need to understand several configs of meta-training.
-
-In ['configs/base.yaml'](configs/base.yaml) :
-- `run` : running mode, for meta-training we set it to `meta_train`.
-- `name` : name for save and output, choose a name you like.
-- `task` : choose task to run, `resnet56_on_CIFAR10` or `VGG19_on_CIFAR100`.
-
-We take `resnet56_on_CIFAR10` as example, in ['configs/task/resnet56_on_CIFAR10.yaml'](configs/task/resnet56_on_CIFAR10.yaml) :
-- `meta_train` : set hyperparameters like epochs and lr for meta-training.
-- `metanetwork` : set the size and res coefficient of metanetwork
-
-To meta_train, run:
+After all data models generated, we can do meta-training by running:
 ```bash
-python main.py run=meta_train task=resnet56_on_CIFAR10 name=Test 
+sh scripts/meta_train.sh
 ```
+Before running, we should modefied hyperparameters in `meta_train.sh`. We should change `NAME` to the same as `finetune.sh`, and set `DATA_MODEL_NUM` as our data model numbers. data model numbers should be less than your parallel gpu numbers (we suggest you to use 8 gpus just like us). And it should also be strictly less than your data model numbers, because we need the rest data models for visualization and test. If we set `DATA_MODEL_NUM` as 2, it will use data models of index 0 and 1 for meta-training.
 
 ### Select appropriate metanetwork for pruning
 
-To control the finetuning stages — both after metanetwork and after pruning — we use the `pruning` configuration in ['configs/task/resnet56_on_CIFAR10'](configs/task/resnet56_on_CIFAR10.yaml) . Within this configuration, the `finetuning` includes two key parameters: `after_pruning` and `after_metanetwork`. These parameters are used to set the hyperparameters for finetuning after metanetwork and finetuning after pruning.
-
-We search for the most suitable metanetwork by visualizing its performance using a binary search strategy. Every time we visualize a metanetwork, we pass a data model through it, followed by finetuning with hyperparameters same as `pruning.finetune.after_metanetwork`, and then visualize the ``Test Accuracy vs.\ Speed-Up'' curve of the resulting model.
-(A little trick is that if finetuning during visualize a metanetwork costs too much time, we can temporarily change the `epochs` and `lr_deacy_milestones` in configs to be smaller, and change them back while pruning, this can save lots of time in `VGG_on_CIFAR100`)
-
-We take `resnet56_on_CIFAR10` as example. First, we want to visualize metanetwork at epoch 50, we should run :
+Like we mentioned in *Quick Reproduce*, we can visualize our metanetwork by run :
 ```bash
-python main.py task=resnet56_on_CIFAR10 name=Test run=visualize index=50
+sh scripts/visualize.sh
 ```
-Because we are doing it in a binary search way, so based on the performance we may later run:
-```bash
-python main.py task=resnet56_on_CIFAR10 name=Test run=visualize index=25
-# or
-python main.py task=resnet56_on_CIFAR10 name=Test run=visualize index=75
-```
-We can also visualize many metanetworks at a time:
-```bash
-python main.py task=resnet56_on_CIFAR10 name=Test run=visualize index=[30,40,50]
-```
+Set `INDEX` to a index that haven't been used during meta-training (usually the largest index). And change `METANETWORK_INDEX` to search for the proper metanetwork in a binary search way.
 
 ### Pruning
 
-To do final pruning, first we need to choose a unique `reproduce_index`. Here we use **3** as example.
-
-First, we need to train a model for pruning. We run :
+We prune by run :
 ```bash
-python main.py task=resnet56_on_CIFAR10 name=Test run=pretrain_final index=3
+sh scripts/prune_after_metanetwork.sh
 ```
-
-When finished, we have a directory like
-```
-main/
-├── final/           
-│   ├── resnet56_on_CIFAR10
-│   │   ├── reproduce_3
-│   │   │   └── model.pth
-│   │   └── ... 
-│   └── ...  
-└── README.md               # You are here!
-```
-
-Assuming we use metanetwork at epoch 28 for final pruning, we should copy `epoch_18.pth` from `save/metanetwork/resnet56_on_CIFAR10/Test/level_0/epoch_18.pth` to `final/resnet56_on_CIFAR10/reproduce_3` and rename it as `metanetwork.pth`. So the final directory should look like :
-
-```
-main/
-├── final/           
-│   ├── resnet56_on_CIFAR10
-│   │   ├── reproduce_3
-│   │   │   ├── metanetwork.pth
-│   │   │   └── model.pth
-│   │   └── ... 
-│   └── ...  
-└── README.md               # You are here!
-```
-
-Finally, if we want to pruning with speed up 2.5x, we can run :
-```bash
-python main.py task=resnet56_on_CIFAR10 run=pruning_final name=Test reproduce_index=3 index=2.5
-```
- -->
-
-
+Before running, remember to set the `INDEX`, `METANETWORK_INDEX`, `NAME`, `SPEED_UP`
 
