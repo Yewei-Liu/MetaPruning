@@ -1,6 +1,6 @@
 #!/bin/bash
 
-INDEX=5  
+INDEX=0
 RUN_TYPE="train_from_scratch"                 
 NAME=Final 
 PRETRAINED=True

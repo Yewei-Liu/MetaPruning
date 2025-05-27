@@ -803,6 +803,7 @@ def main(cfg: DictConfig) -> None:
 
 
     elif cfg.run == 'train_from_scratch':
+        model = registry.get_model(num_classes=1000, name=cfg.model, pretrained=cfg.pretrained, target_dataset='imagenet').to(device)
         train(
             model,
             cfg.epochs,
