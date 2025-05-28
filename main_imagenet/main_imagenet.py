@@ -4,6 +4,7 @@ import sys
 import time
 import warnings
 import registry
+from pathlib import Path
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from PIL import ImageFile
@@ -634,7 +635,8 @@ def main(cfg: DictConfig) -> None:
     if cfg.output_dir:
         utils.mkdir(cfg.output_dir)
 
-    utils.init_distributed_mode(cfg)
+    if not cfg.no_distribution:
+        utils.init_distributed_mode(cfg)
     print(OmegaConf.to_yaml(cfg))
 
     device = torch.device(cfg.device)
@@ -692,18 +694,21 @@ def main(cfg: DictConfig) -> None:
 
 
     elif cfg.run == 'prune': # no parallel
-        ckpt = torch.load(os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'train', 'latest.pth'), weights_only=False)
+        ckpt = torch.load(os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'train_from_scratch', 'latest.pth'), weights_only=False)
         model = state_dict_to_model('resnet50', ckpt['model'])
         speed_up, model = progressive_pruning(model, 'IMAGENET', data_loader, data_loader_test, cfg.speed_up, log=True, eval_train_data=False)
         torch.save(model.state_dict(), os.path.join(cfg.output_dir, f'{speed_up:.4f}.pth'))
         print(model)
     
     elif cfg.run == 'finetune': 
-        state_dict = torch.load(os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'prune', f'{cfg.speed_up:.4f}.pth'), map_location=device)
+        dir = os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'prune')
+        pth_files = list(Path(dir).glob('*.pth'))
+        assert len(pth_files) == 1, f'Only one pth file is expected in {dir}, but got {len(pth_files)}'
+        state_dict = torch.load(pth_files[0], map_location=device, weights_only=False)
         model = state_dict_to_model('resnet50', state_dict, device)
         del state_dict
-        cfg.output_dir = os.path.join(cfg.output_dir, f'{cfg.speed_up:.4f}')
-        cfg.resume = os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'finetune', f'{cfg.speed_up:.4f}', 'epoch_40.pth')
+        if cfg.resume_epoch != -1:
+            cfg.resume = os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'finetune', f'epoch_{cfg.resume_epoch}.pth')
         train(
             model,
             cfg.epochs,

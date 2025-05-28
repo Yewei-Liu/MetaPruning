@@ -1,6 +1,6 @@
 #!/bin/bash
 
-INDEX=2
+INDEX=0
 RUN_TYPE="prune"               
 SPEED_UP=1.2920
 NAME=Final 

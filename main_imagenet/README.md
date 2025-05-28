@@ -87,7 +87,7 @@ sh scripts/finetune.sh
 ### Meta-Training
 
 After all data models generated, we first gather them together in a directory `save/NAME/meta_train/data_model/`. For example, if our `NAME` is `Final`, we should create a directory 
-`save/Final/meta_train/data_model/`, then we should copy all data models into it. For example, if we have 3 data models with `INDEX` 0, 1, 2, we should move `save/Final/0/train_from_scratch/latest.pth` to `save/Final/meta_train/data_model/latest.pth` and rename it as `0.pth`, so it is with 1, 2.
+`save/Final/meta_train/data_model/`, then we should copy all data models into it. For example, if we have 3 data models with `INDEX` 0, 1, 2, we should move `save/Final/0/finetune/latest.pth` to `save/Final/meta_train/data_model/latest.pth` and rename it as `0.pth`, so it is with 1, 2.
 Finally, we'll have a directory like this :
 ```
 main_imagenet/

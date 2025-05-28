@@ -1,12 +1,12 @@
 #!/bin/bash
 
-INDEX=2
+INDEX=0
 RUN_TYPE="finetune"                 
 NAME=Final
 EPOCHS=60
 LR=0.01
 LR_DECAY_MILESTOMES=\'30\'
-SPEED_UP=1.2987
+RESUME_EPOCH=-1
 
 NUM_GPUS=8                     
 MASTER_PORT=18900             
@@ -42,5 +42,6 @@ torchrun \
     epochs=$EPOCHS \
     lr=$LR \
     speed_up=$SPEED_UP \
+    resume_epoch=$RESUME_EPOCH \
     lr_decay_milestones=$LR_DECAY_MILESTOMES \
     > "save/${NAME}/${INDEX}/${RUN_TYPE}/${SPEED_UP}/finetune.log" &

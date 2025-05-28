@@ -22,7 +22,7 @@ metanetwork:
     edge_res_ratio: 0.001
 
 meta_train:
-  epochs: 100
+  epochs: 40
   opt: "adamw"
   lr_scheduler: "steplr"
   lr : 0.01 
