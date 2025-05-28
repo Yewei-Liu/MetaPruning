@@ -3,6 +3,7 @@
 DATA_MODEL_NUM=2
 RUN_TYPE="meta_train"     
 NAME=Final 
+RESUME_EPOCH=-1
 
 NUM_GPUS=8                     
 MASTER_PORT=18900             
@@ -35,5 +36,6 @@ torchrun \
     +experiment=$CONFIG_NAME \
     run=$RUN_TYPE \
     data_model_num=$DATA_MODEL_NUM \
+    resume_epoch=$RESUME_EPOCH \
     name=$NAME \
     > "save/${NAME}/${RUN_TYPE}/train.log" &

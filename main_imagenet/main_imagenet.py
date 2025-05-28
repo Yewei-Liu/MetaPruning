@@ -683,21 +683,10 @@ def main(cfg: DictConfig) -> None:
     )
   
     if cfg.run == 'meta_train':
-        # model_name = 'resnet50'
-        # example_inputs = torch.randn(1, 3, 224, 224).to(device)
-        # base_model = registry.get_model(num_classes=1000, name=cfg.model, pretrained=cfg.pretrained, target_dataset='imagenet').to(device)
-        # base_ops, base_params = tp.utils.count_ops_and_params(base_model, example_inputs=example_inputs)
-        # del base_model
-        # print(cfg.data_model_num)
-        # for i in range(2, 3):
-        #     ckpt = torch.load(os.path.join('save', f'{cfg.name}', 'meta_train', 'data_model', f'{i}.pth'), weights_only=False, map_location=device)
-        #     model = state_dict_to_model(model_name, ckpt['model'], device)
-        #     pruned_ops, pruned_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
-        #     print(base_ops / pruned_ops)
-        # exit()
         metanetwork_config = OmegaConf.select(cfg.metanetwork, str(cfg.level))
         metanetwork = hydra.utils.instantiate(metanetwork_config).to(device)
-        cfg.resume = os.path.join('save', f'{cfg.name}', 'meta_train', 'metanetwork', f"epoch_9.pth")
+        if cfg.resume_epoch != -1:
+            cfg.resume = os.path.join('save', f'{cfg.name}', 'meta_train', 'metanetwork', f"epoch_{cfg.resume_epoch}.pth")
         metanetwork = meta_train(cfg.data_model_num, metanetwork, cfg.meta_train.epochs, cfg.meta_train.lr, 
                                  cfg.meta_train.lr_warmup_epochs, train_sampler, big_data_loader, device, cfg.meta_train, cfg)
 
@@ -816,6 +805,7 @@ def main(cfg: DictConfig) -> None:
             cfg=cfg,
             pruner=None,
             state_dict_only=True,
+            save_every_epoch=True,
         )
 
 
