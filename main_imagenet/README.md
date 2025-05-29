@@ -108,6 +108,8 @@ sh scripts/meta_train.sh
 ```
 Before running, we should modefied hyperparameters in `meta_train.sh`. We should change `NAME` to the same as `finetune.sh`, and set `DATA_MODEL_NUM` as our data model numbers. Data model numbers should be less than your parallel gpu numbers (we suggest you to use 8 gpus just like us). And it should also be strictly less than your data model numbers, because we need the rest data models for visualization and test. If we set `DATA_MODEL_NUM` as 2, it will use data models of index 0 and 1 for meta-training, and we can use data model 2 for visualization and test.
 
+For better performance, you can search for a reasonable `lr_decay_milestone` first. See Appendix A.2 in our paper.
+
 ### Select appropriate metanetwork for pruning
 
 Like we mentioned in *Quick Reproduce*, we can visualize our metanetwork by run :
