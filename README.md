@@ -5,7 +5,7 @@
 **[Basic info]**  
 *Authors: [Yewei Liu], [Xiyuan Wang], [Muhan Zhang]*  
 <!--*Conference/Journal: [e.g., NeurIPS 2025, arXiv preprint]* --> 
-*Arxiv : [[Arxiv Link](https://arxiv.org/abs/2506.12041)]*  
+<!--*Arxiv : [[Arxiv Link](https://arxiv.org/abs/2506.12041)]* -->  
 <!-- *Published Version: [insert DOI or link if available]* -->
 
 ## 🔍 Overview
