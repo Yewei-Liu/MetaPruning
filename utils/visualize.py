@@ -7,9 +7,10 @@ from torch_geometric.data import Data
 import numpy as np
 from utils.pruning import get_pruner
 import torch_pruning as tp
-from utils.logging import get_logger
+from utils.mylogging import get_logger
 from utils.train import eval
 import os
+import pickle
 
 def get_acc_speed_up_list(
         model,
@@ -52,7 +53,8 @@ def visualize_acc_speed_up_curve(
         ylim=(0.0, 1.0),
         log=True,
         figsize=(20, 20),
-        font_scale=1.5  # New parameter to control font scaling
+        font_scale=1.5,  # New parameter to control font scaling
+        resume_path=None,
 ):
     os.makedirs(save_dir, exist_ok=True)
     if log:
@@ -72,15 +74,35 @@ def visualize_acc_speed_up_curve(
     
     plt.figure(figsize=figsize)
     
+    if resume_path is not None:
+        if log:
+            logger.info(f"Load existing statistics from {resume_path}, no need to recalculate.")
+        with open(resume_path, "rb") as f:
+            t = pickle.load(f)
+            acc_list_dict = t['acc_list_dict']
+            speed_up_list_dict = t['speed_up_list_dict']
+    else:
+        acc_list_dict = {}
+        speed_up_list_dict = {}
+            
+    
     if isinstance(models, list):
         assert isinstance(base_speed_up, list), 'if models are list, base_speed_up must be list !'
         for i, m in enumerate(models):
-            acc_list, speed_up_list = get_acc_speed_up_list(m, dataset_name, test_loader, base_speed_up[i], max_speed_up, method)
+            if resume_path is not None:
+                acc_list, speed_up_list = acc_list_dict[i], speed_up_list_dict[i]
+            else:
+                acc_list, speed_up_list = get_acc_speed_up_list(m, dataset_name, test_loader, base_speed_up[i], max_speed_up, method)
+                acc_list_dict[i], speed_up_list_dict[i] = acc_list, speed_up_list
             plt.plot(speed_up_list, acc_list, marker=marker, label=labels[i], markersize=4*font_scale, linewidth=2*font_scale)
             if log:
                 logger.info(f"Model {i+1}/{len(models)} visualized")
     else:
-        acc_list, speed_up_list = get_acc_speed_up_list(models, dataset_name, test_loader, base_speed_up, max_speed_up, method)
+        if resume_path is not None:
+            acc_list, speed_up_list = acc_list_dict[0], speed_up_list_dict[0]
+        else:
+            acc_list, speed_up_list = get_acc_speed_up_list(models, dataset_name, test_loader, base_speed_up, max_speed_up, method)
+            acc_list_dict[0], speed_up_list_dict[0] = acc_list, speed_up_list 
         plt.plot(speed_up_list, acc_list, marker=marker, label=labels, markersize=4*font_scale, linewidth=2*font_scale)
     
     plt.xlabel('Speed Up', fontsize=14 * font_scale)  # You can override individual elements if needed
@@ -99,5 +121,17 @@ def visualize_acc_speed_up_curve(
     
     plt.savefig(os.path.join(save_dir, name), dpi=300, bbox_inches='tight')  # Higher DPI and tight layout
     plt.close()  # Close the figure to free memory
+    
+    if resume_path is None:
+        save_path = os.path.join(save_dir, f"{os.path.splitext(name)[0]}.pkl")
+        with open(save_path, 'wb') as f:
+            pickle.dump({'acc_list_dict': acc_list_dict, 'speed_up_list_dict': speed_up_list_dict}, f)
+        if log:
+            logger.info(f"Statistics saved to {save_path}")
+    
     if log:
+        for i in range(len(acc_list_dict)):
+            logger.info({f"{speed_up_list_dict[i][j]:.2f}": f"{acc_list_dict[i][j]:.4f}" for j in range(len(acc_list_dict[i]))})
         logger.info("End visualizing")
+    return acc_list_dict, speed_up_list_dict
+

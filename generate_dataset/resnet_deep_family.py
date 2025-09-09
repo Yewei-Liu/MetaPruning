@@ -131,7 +131,7 @@ class ResNetDeep(nn.Module):
             return out
         
 class MyResNetDeep(nn.Module):
-    def __init__(self, node_num, num_blocks=[3,4,6,3], num_classes=1000):
+    def __init__(self, node_num, num_blocks=[3,4,6,3]):
         super().__init__()
         self.node_num = node_num
         self.idx = 1
@@ -144,7 +144,7 @@ class MyResNetDeep(nn.Module):
         self.layer3 = self._make_layer(num_blocks[2], stride=2)
         self.layer4 = self._make_layer(num_blocks[3], stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(node_num[-2], num_classes)
+        self.fc = nn.Linear(node_num[-2], node_num[-1])
 
     def _make_layer(self, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
@@ -191,4 +191,7 @@ def myresnet152(num_classes=10):
     return ResNetDeep(Bottleneck, [3,8,36,3], num_classes)
 
 if __name__ == "__main__":
-    print(myresnet50(1000))
+    res = myresnet50(1000)
+    node_index, node_features, edge_index, edge_features_list = resnet50_state_dict_to_graph(res.state_dict())
+    print(edge_index[:5])
+    print(edge_features_list[0][:5])

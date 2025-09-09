@@ -1,7 +1,9 @@
 #!/bin/bash
 
-DATA_MODEL_NUM=2
-RUN_TYPE="meta_train"     
+MODEL="resnet50"  
+INDEX=2
+METANETWORK_INDEX=13
+RUN_TYPE="visualize"                
 NAME=Final 
 RESUME_EPOCH=-1
 
@@ -21,9 +23,7 @@ done
 export HYDRA_FULL_ERROR=1
 export OMP_NUM_THREADS=4
 
-mkdir -p "save/${NAME}/${RUN_TYPE}"
-mkdir -p "save/${NAME}/${RUN_TYPE}/metanetwork"
-# save/Maybe/0/meta_train/metanetwork 
+mkdir -p "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/"
 
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup \
 torchrun \
@@ -34,8 +34,10 @@ torchrun \
     --master_port=$MASTER_PORT \
     main_imagenet.py \
     +experiment=$CONFIG_NAME \
+    model=$MODEL \
     run=$RUN_TYPE \
-    data_model_num=$DATA_MODEL_NUM \
-    resume_epoch=$RESUME_EPOCH \
+    index=$INDEX \
     name=$NAME \
-    > "save/${NAME}/${RUN_TYPE}/train.log" &
+    resume_epoch=$RESUME_EPOCH \
+    +metanetwork_index=$METANETWORK_INDEX \
+    > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${INDEX}.log" &

@@ -1,7 +1,7 @@
 import torchvision.transforms as transforms
 import torch
 import torchvision
-from utils.logging import get_logger
+from utils.mylogging import get_logger
 from omegaconf import OmegaConf
 import datasets
 import numpy as np
@@ -70,6 +70,35 @@ def get_dataset_loader(cfg, log=False):
             root=cfg.dataset_path, train=True, download=True, transform=transform_train)
         testset = torchvision.datasets.CIFAR100(
             root=cfg.dataset_path, train=False, download=True, transform=transform_test)
+        if use_seed:
+            train_loader = torch.utils.data.DataLoader(
+                trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers,
+                worker_init_fn=seed_worker, generator=generator)
+            test_loader = torch.utils.data.DataLoader(
+                testset, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers,
+                worker_init_fn=seed_worker, generator=generator)
+        else:
+            train_loader = torch.utils.data.DataLoader(
+                trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers)
+            test_loader = torch.utils.data.DataLoader(
+                testset, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers)
+    elif cfg.dataset_name == 'SVHN':
+        # SVHN mean and std (computed over the training set)
+        svhn_mean = (0.4377, 0.4438, 0.4728)
+        svhn_std = (0.1980, 0.2010, 0.1970)
+        transform_train = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.ToTensor(),
+            transforms.Normalize(svhn_mean, svhn_std),
+        ])
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(svhn_mean, svhn_std),
+        ])
+        trainset = torchvision.datasets.SVHN(
+            root=cfg.dataset_path, split='train', download=True, transform=transform_train)
+        testset = torchvision.datasets.SVHN(
+            root=cfg.dataset_path, split='test', download=True, transform=transform_test)
         if use_seed:
             train_loader = torch.utils.data.DataLoader(
                 trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers,

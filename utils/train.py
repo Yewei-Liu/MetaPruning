@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from utils.logging import get_logger
+from utils.mylogging import get_logger
 from copy import deepcopy
 from utils.pruner import get_pruner
 

@@ -1,11 +1,13 @@
 #!/bin/bash
 
-INDEX=2
-METANETWORK_INDEX=13
-RUN_TYPE="prune_after_metanetwork"                
+MODEL="resnet50"  
+INDEX=0
+RUN_TYPE="train_from_scratch"                 
 NAME=Final 
-SPEED_UP=2.3095
-RESUME_EPOCH=-1
+PRETRAINED=True
+EPOCHS=30
+LR=0.01
+LR_DECAY_MILESTOMES=\'10\'
 
 NUM_GPUS=8                     
 MASTER_PORT=18900             
@@ -23,7 +25,7 @@ done
 export HYDRA_FULL_ERROR=1
 export OMP_NUM_THREADS=4
 
-mkdir -p "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${SPEED_UP}/"
+mkdir -p "save/${NAME}/${INDEX}/${RUN_TYPE}"
 
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup \
 torchrun \
@@ -34,10 +36,12 @@ torchrun \
     --master_port=$MASTER_PORT \
     main_imagenet.py \
     +experiment=$CONFIG_NAME \
+    model=$MODEL \
     run=$RUN_TYPE \
     index=$INDEX \
     name=$NAME \
-    speed_up=$SPEED_UP \
-    resume_epoch=$RESUME_EPOCH \
-    +metanetwork_index=$METANETWORK_INDEX \
-    > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${SPEED_UP}/prune.log" &
+    epochs=$EPOCHS \
+    lr=$LR \
+    lr_decay_milestones=$LR_DECAY_MILESTOMES \
+    pretrained=$PRETRAINED \
+    > "save/${NAME}/${INDEX}/${RUN_TYPE}/${INDEX}.log" &

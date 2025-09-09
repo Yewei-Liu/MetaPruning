@@ -2,7 +2,7 @@ import time
 import hydra
 from omegaconf import OmegaConf
 from datasets import Dataset
-from utils.logging import get_logger
+from utils.mylogging import get_logger
 import os
 
 @hydra.main(config_path="configs", config_name="base", version_base=None)

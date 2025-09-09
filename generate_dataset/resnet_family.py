@@ -226,7 +226,7 @@ class MyBasicBlock(nn.Module):
         return out
     
 class MyResNet(nn.Module):
-    def __init__(self, depth, node_num, num_classes=10):
+    def __init__(self, depth, node_num):
         super().__init__()
         assert (depth - 2) % 6 == 0, 'When use basicblock, depth should be 6n+2, e.g. 20, 32, 44, 56, 110, 1202'
         n = (depth - 2) // 6
@@ -241,7 +241,7 @@ class MyResNet(nn.Module):
         self.layer2 = self._make_layer(n, stride=2)
         self.layer3 = self._make_layer(n, stride=2)
         self.avgpool = nn.AvgPool2d(8)
-        self.fc = nn.Linear(node_num[-2], num_classes)
+        self.fc = nn.Linear(node_num[-2], node_num[-1])
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -282,3 +282,8 @@ class MyResNet(nn.Module):
         if return_features:
             return x, features
         return x
+
+if __name__ == '__main__':
+    resnet = resnet56(10)
+    for key, val in resnet.state_dict().items():
+        print(key, val.shape)

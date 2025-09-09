@@ -1,11 +1,9 @@
 #!/bin/bash
 
-INDEX=0
-RUN_TYPE="finetune"                 
-NAME=Final
-EPOCHS=60
-LR=0.01
-LR_DECAY_MILESTOMES=\'30\'
+MODEL="resnet50"  
+DATA_MODEL_NUM=2
+RUN_TYPE="meta_train"     
+NAME=Final 
 RESUME_EPOCH=-1
 
 NUM_GPUS=8                     
@@ -24,8 +22,9 @@ done
 export HYDRA_FULL_ERROR=1
 export OMP_NUM_THREADS=4
 
-mkdir -p "save/${NAME}/${INDEX}/${RUN_TYPE}/${SPEED_UP}"
-
+mkdir -p "save/${NAME}/${RUN_TYPE}"
+mkdir -p "save/${NAME}/${RUN_TYPE}/metanetwork"
+# save/Maybe/0/meta_train/metanetwork 
 
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup \
 torchrun \
@@ -36,12 +35,9 @@ torchrun \
     --master_port=$MASTER_PORT \
     main_imagenet.py \
     +experiment=$CONFIG_NAME \
+    model=$MODEL \
     run=$RUN_TYPE \
-    index=$INDEX \
-    name=$NAME \
-    epochs=$EPOCHS \
-    lr=$LR \
-    speed_up=$SPEED_UP \
+    data_model_num=$DATA_MODEL_NUM \
     resume_epoch=$RESUME_EPOCH \
-    lr_decay_milestones=$LR_DECAY_MILESTOMES \
-    > "save/${NAME}/${INDEX}/${RUN_TYPE}/${SPEED_UP}/finetune.log" &
+    name=$NAME \
+    > "save/${NAME}/${RUN_TYPE}/train.log" &

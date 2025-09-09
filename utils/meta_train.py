@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch.func import functional_call
 import numpy as np
-from utils.logging import get_logger
+from utils.mylogging import get_logger
 from utils.train import train, eval
 from utils.convert import graph_to_state_dict, state_dict_to_model, graph_to_model
 from utils.pruner import get_pruner
@@ -27,6 +27,12 @@ def meta_eval(
     device = None,
     verbose = False,
 ):
+    '''
+    Evaluation the quality of metanetwork during meta-training.
+    We didn't use it in our final experiments because it costs too much time (need finetuning during each eval).
+    You can explore it by yourself if you want.
+    '''
+    
     speed_up_threshold = cfg.speed_up_threshold
     epochs = cfg.epochs
     lr = cfg.lr
@@ -54,12 +60,11 @@ def meta_eval(
         gt_train_loss_list.append(info['train_loss'])
         gt_val_acc_list.append(info['val_acc'])
         gt_val_loss_list.append(info['val_loss'])
+        gt_speed_up_list.append(info['current_speed_up'])
         tmp_model = state_dict_to_model(model_name, model.state_dict())
         tmp_model.eval().to(device)
         if log and verbose:
             logger.info("Origin :")
-        speedup, _ = adaptive_pruning(tmp_model, model_name, dataset_name, big_train_data_loader, big_val_data_loader, speed_up_threshold, method, verbose, device)
-        gt_speed_up_list.append(speedup)
         with torch.no_grad():
             node_pred, edge_pred = metanetwork.forward(node_features.to(device), edge_index.to(device), edge_features.to(device))
             model = graph_to_model(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
@@ -115,9 +120,9 @@ def meta_train(
     lr_decay_gamma = cfg.lr_decay_gamma
     weight_decay = cfg.weight_decay
     method = cfg.method
+    alpha = cfg.alpha
+    bias = cfg.bias
     pruner_reg = cfg.pruner_reg
-    if isinstance(pruner_reg, omegaconf.listconfig.ListConfig):
-        pruner_reg = pruner_reg[cfg.level]
     save_every_epoch = cfg.save_every_epoch
     warm_up = cfg.warm_up
     save_path = cfg.save_path
@@ -161,7 +166,7 @@ def meta_train(
                 for param in model.parameters():
                     if param.requires_grad:
                         param.grad = torch.zeros_like(param)    
-                pruner.regularize(model)
+                pruner.regularize(model, alpha=alpha, bias=bias)
                 big_tensor = []
                 big_gradient = []
                 for name, param in model.named_parameters():

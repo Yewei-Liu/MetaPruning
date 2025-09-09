@@ -5,9 +5,8 @@ defaults:
 __recursive_: True
 
 name: Qwq
-level: 0
 run: meta_train
-method: 'group_sl'
+method: group_l2_norm_max_normalizer
 log: True
 reproduce_index: 0
 seed: 7
@@ -17,26 +16,5 @@ index: 'train'
 
 hydra:
   run:
-    dir: ./outputs/${task.task_name}/${name}/level_${level}/${run}/${index}/${now:%Y-%m-%d_%H-%M-%S}
+    dir: ./outputs/${task.task_name}/${method}_${task.meta_train.alpha}/${name}/${run}/${index}/${now:%Y-%m-%d_%H-%M-%S}
 
-
-# defaults:
-#   - task: resnet56_on_CIFAR10
-#   - _self_
-
-# __recursive_: True
-
-# name: Paris
-# level: 0
-# run: meta_train
-# method: 'group_sl'
-# log: True
-# reproduce_index: 20
-# seed: 7
-
-# # no need to change
-# index: 'train' 
-
-# hydra:
-#   run:
-#     dir: ./outputs/${task.task_name}/${name}/level_${level}/${run}/${index}/${now:%Y-%m-%d_%H-%M-%S}

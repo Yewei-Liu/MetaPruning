@@ -24,26 +24,27 @@ small_batch_dataset:
   seed: ${seed}
 
 dataset_model:
-  dataset_model_name: resnet56_on_CIFAR10
+  dataset_model_name: ${task.model_name}_on_${task.dataset.dataset_name}
   train_split: 0.8
-  dataset_model_path: ../dataset_model/${task.dataset_model.dataset_model_name}_level_${level}
+  dataset_model_path: ../dataset_model/${task.dataset_model.dataset_model_name}/${method}
   seed: ${seed}
   # val_split = 1 - train_split
 
 meta_train:
   epochs: 100
   lr : 0.001 
-  lr_decay_milestones : "7"
+  lr_decay_milestones : "3"
   lr_decay_gamma : 0.1
   weight_decay : 5e-4
   method : ${method}
-  pruner_reg : [10]
+  alpha: 16
+  bias: False
+  pruner_reg : 10
   save_every_epoch : 1
   warm_up : 0
-  level: ${level}
   model_name : ${task.model_name}
   dataset_name : ${task.dataset.dataset_name}
-  save_path: 'save/metanetwork/${task.dataset_model.dataset_model_name}/${name}/level_${level}/'
+  save_path: 'save/metanetwork/${task.dataset_model.dataset_model_name}/${method}_${task.meta_train.alpha}/${name}/'
   use_meta_eval: False
   # Following are only used when use_meta_eval is True
   meta_eval:
@@ -56,27 +57,25 @@ meta_train:
     weight_decay: ${task.pruning.finetune.after_metanetwork.weight_decay}
 
 metanetwork:
-  '0':
-    _target_: nn.GNN.MyGNN
-    _recursive_: True
-    num_layer: 8
-    hiddim: 64
-    in_node_dim: 8
-    in_edge_dim: 9
-    node_res_ratio: 0.01
-    edge_res_ratio: 0.01
+  _target_: nn.GNN.MyGNN
+  _recursive_: True
+  num_layer: 8
+  hiddim: 64
+  in_node_dim: 8
+  in_edge_dim: 9
+  node_res_ratio: 0.01
+  edge_res_ratio: 0.01
 
 visualize:
   max_speed_up: 3.0
   marker: 'o'
-  save_path: 'save/visualize/${task.dataset_model.dataset_model_name}/${name}/level_${level}/'
+  save_path: 'save/visualize/${task.dataset_model.dataset_model_name}/${method}_${task.meta_train.alpha}/${name}/'
   ylim: [0.8, 1.0]
   figsize: [10, 10]
   font_scale: 1.5
 
 pruning:
   pruning_index: 2.3
-  level: ${level}
   method: ${method}
   opt: 'sgd'
   finetune:

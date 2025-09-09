@@ -34,7 +34,7 @@ See ['scripts'](scripts/resnet56_on_CIFAR10.sh) to choose your scripts for pruni
 
 In each script : 
 ```bash
-python main.py task=resnet56_on_CIFAR10 name=Final run=pruning_final reproduce_index=0 seed=7 index=2.3
+python main.py task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer name=Final run=pruning_final reproduce_index=0 seed=7 index=2.3
 ```
 You can Change:
 - `task` : Specify which task to run. `resnet56_on_CIFAR10` or `VGG19_on_CIFAR100`.
@@ -62,6 +62,7 @@ In ['configs/base.yaml'](configs/base.yaml) :
 - `run` : running mode, for meta-training we set it to `meta_train`.
 - `name` : name for save and output, choose a name you like.
 - `task` : choose task to run, `resnet56_on_CIFAR10` or `VGG19_on_CIFAR100`.
+- `method` : Which pruning criterion to use. You can choose from `standard_l1_norm` `standard_l2_norm` `group_l2_norm` `group_l2_norm_max_normalizer` or add your own pruning criterion at ['utils/pruner.py'](../utils/pruner.py)
 
 We take `resnet56_on_CIFAR10` as example, in ['configs/task/resnet56_on_CIFAR10.yaml'](configs/task/resnet56_on_CIFAR10.yaml) :
 - `meta_train` : set hyperparameters like epochs and lr for meta-training.
@@ -71,30 +72,33 @@ For better performance, you can search for a reasonable `lr_decay_milestone` fir
 
 To meta_train, run:
 ```bash
-python main.py run=meta_train task=resnet56_on_CIFAR10 name=Test 
+python main.py run=meta_train task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer name=Test 
 ```
 
 ### Select appropriate metanetwork for pruning
 
 To control the finetuning stages — both after metanetwork and after pruning — we use the `pruning` configuration in ['configs/task/resnet56_on_CIFAR10'](configs/task/resnet56_on_CIFAR10.yaml) . Within this configuration, the `finetuning` includes two key parameters: `after_pruning` and `after_metanetwork`. These parameters are used to set the hyperparameters for finetuning after metanetwork and finetuning after pruning.
 
-We search for the most suitable metanetwork by visualizing its performance using a binary search strategy. Every time we visualize a metanetwork, we pass a data model through it, followed by finetuning with hyperparameters same as `pruning.finetune.after_metanetwork`, and then visualize the ``Test Accuracy vs.\ Speed-Up'' curve of the resulting model.
-(A little trick is that if finetuning during visualize a metanetwork costs too much time, we can temporarily change the `epochs` and `lr_deacy_milestones` in configs to be smaller, and change them back while pruning, this can save lots of time in `VGG_on_CIFAR100`)
+We search for the most suitable metanetwork by visualizing its performance using a binary search strategy. Every time we visualize a metanetwork, we pass a data model through it, followed by finetuning with hyperparameters same as `pruning.finetune.after_metanetwork`, and then visualize the ``Test Accuracy vs. Speed-Up'' curve of the resulting model.
+(A little trick is that if finetuning during visualize a metanetwork costs too much time, we can temporarily change the `epochs` and `lr_deacy_milestones` in configs to be smaller, and change them back while pruning)
 
 We take `resnet56_on_CIFAR10` as example. First, we want to visualize metanetwork at epoch 50, we should run :
 ```bash
-python main.py task=resnet56_on_CIFAR10 name=Test run=visualize index=50
+python main.py task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer name=Test run=visualize index=50
 ```
 Because we are doing it in a binary search way, so based on the performance we may later run:
 ```bash
-python main.py task=resnet56_on_CIFAR10 name=Test run=visualize index=25
+python main.py task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer name=Test run=visualize index=25
 # or
-python main.py task=resnet56_on_CIFAR10 name=Test run=visualize index=75
+python main.py task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer name=Test run=visualize index=75
 ```
 We can also visualize many metanetworks at a time:
 ```bash
-python main.py task=resnet56_on_CIFAR10 name=Test run=visualize index=[30,40,50]
+python main.py task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer name=Test run=visualize index=[30,40,50]
+# If you want to also visualize the original network without metanetwork, you can add a 0 at the start of index list like
+python main.py task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer name=Test run=visualize index=[0,30,40,50]
 ```
+After visualizing, pictures are generated and statistics are saved for reusing.
 
 ### Pruning
 
@@ -102,7 +106,7 @@ To do final pruning, first we need to choose a unique `reproduce_index`. Here we
 
 First, we need to train a model for pruning. We run :
 ```bash
-python main.py task=resnet56_on_CIFAR10 name=Test run=pretrain_final index=3
+python main.py task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer name=Test run=pretrain_final index=3
 ```
 
 When finished, we have a directory like
@@ -110,8 +114,9 @@ When finished, we have a directory like
 main/
 ├── final/           
 │   ├── resnet56_on_CIFAR10
-│   │   ├── reproduce_3
-│   │   │   └── model.pth
+│   │   ├── group_l2_norm_max_normalizer
+│   │   │   └── rereproduce_3
+│   │   │       └── model.pth
 │   │   └── ... 
 │   └── ...  
 └── README.md               # You are here!
@@ -123,9 +128,10 @@ Assuming we use metanetwork at epoch 28 for final pruning, we should copy `epoch
 main/
 ├── final/           
 │   ├── resnet56_on_CIFAR10
-│   │   ├── reproduce_3
-│   │   │   ├── metanetwork.pth
-│   │   │   └── model.pth
+│   │   ├── group_l2_norm_max_normalizer
+│   │   │   └── rereproduce_3
+│   │   │       ├── metanetwork.pth
+│   │   │       └── model.pth
 │   │   └── ... 
 │   └── ...  
 └── README.md               # You are here!
@@ -133,7 +139,7 @@ main/
 
 Finally, if we want to pruning with speed up 2.5x, we can run :
 ```bash
-python main.py task=resnet56_on_CIFAR10 run=pruning_final name=Test reproduce_index=3 index=2.5
+python main.py task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer run=pruning_final name=Test reproduce_index=3 index=2.5
 ```
 
 

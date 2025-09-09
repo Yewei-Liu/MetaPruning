@@ -4,29 +4,25 @@ defaults:
 
 _recursive_: True 
 
-level: 0
 index: 0  # unique index for parrallel generation and merge
 num: 3 # number of generated data points
 num_proc: 1
-
+method: 'group_l2_norm_max_normalizer'
 
 
 # Follows are defaults, no need to change.
 
-method: 'group_sl'
 name: ${data_generator.model_name}_on_${data_generator.dataset_name}
 model_name: ${data_generator.model_name}
 dataset_name: ${data_generator.dataset_name}
-save_path: ../dataset_model/${name}_level_${level}_${index}   # path to save the generated dataset
+save_path: ../dataset_model/${name}/${method}_${index}   # path to save the generated dataset
 dataset_path: ../dataset/${data_generator.dataset_name}     # path to CIFAR10 for example
-cache_path: .cache/${index}
+cache_path: .cache/${name}/${method}_${index}
 
 generator:
   _target_: ${data_generator.target}
   _recursive_: True 
   _partial_: True  
-  level: ${level}
-  method: ${method}
   num: ${num}
   cfg: ${data_generator.cfg}
   cfg_big_dataset: ${big_batch_dataset}

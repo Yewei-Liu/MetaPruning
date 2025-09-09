@@ -12,6 +12,7 @@ History/
 outputs/
 main/save/**
 main/*.txt
+main/without_init
 main_imagenet/*.txt
 main_imagenet/outputs/**
 main_imagenet/save/**
@@ -19,3 +20,5 @@ main_imagenet/main_imagenet.log
 __pycache__/
 nohup.out
 *.egg-info
+
+tmp/

@@ -196,7 +196,7 @@ def vgg19_bn(**kwargs):
 
 class MyVGG(nn.Module):
 
-    def __init__(self, node_num, cfg=cfg['E'], batch_norm=True, num_classes=100):
+    def __init__(self, node_num, cfg=cfg['E'], batch_norm=True):
         super().__init__()
 
         self.node_num = node_num
@@ -214,7 +214,7 @@ class MyVGG(nn.Module):
         self.pool4 = nn.AdaptiveAvgPool2d((1, 1))
         # self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.classifier = nn.Linear(self.node_num[-2], num_classes)
+        self.classifier = nn.Linear(self.node_num[-2], self.node_num[-1])
         self._initialize_weights()
 
     def get_feat_modules(self):

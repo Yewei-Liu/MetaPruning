@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from datasets import Dataset
 from data_loaders.dataset import DatasetModel
 from torch.utils.data import DataLoader
-from utils.logging import get_logger
+from utils.mylogging import get_logger
 from omegaconf import OmegaConf
 import numpy as np
 import random

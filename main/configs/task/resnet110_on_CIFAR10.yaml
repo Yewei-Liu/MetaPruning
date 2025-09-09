@@ -1,10 +1,10 @@
 _recursive_: True 
 
-model_name: VGG19
+model_name: resnet110
 task_name: ${task.model_name}_on_${task.dataset.dataset_name}
 
 dataset:
-  dataset_name: CIFAR100
+  dataset_name: CIFAR10
   num_workers: 4
   big_batch: 500
   small_batch: 128
@@ -33,7 +33,7 @@ dataset_model:
 meta_train:
   epochs: 100
   lr : 0.001 
-  lr_decay_milestones : "20"
+  lr_decay_milestones : "3"
   lr_decay_gamma : 0.1
   weight_decay : 5e-4
   method : ${method}
@@ -49,7 +49,7 @@ meta_train:
   # Following are only used when use_meta_eval is True
   meta_eval:
     # For adaptive pruning and finetuning
-    speed_up_threshold : 0.68
+    speed_up_threshold : 0.925
     epochs: ${task.pruning.finetune.after_metanetwork.epochs}
     lr: ${task.pruning.finetune.after_metanetwork.lr}
     lr_decay_milestones: ${task.pruning.finetune.after_metanetwork.lr_decay_milestones}
@@ -60,40 +60,39 @@ metanetwork:
   _target_: nn.GNN.MyGNN
   _recursive_: True
   num_layer: 8
-  hiddim: 32
-  in_node_dim: 5
+  hiddim: 64
+  in_node_dim: 8
   in_edge_dim: 9
   node_res_ratio: 0.01
   edge_res_ratio: 0.01
-    
 
 visualize:
   max_speed_up: 10.0
   marker: 'o'
   save_path: 'save/visualize/${task.dataset_model.dataset_model_name}/${method}/${name}/'
-  ylim: [0.5, 0.8]
+  ylim: [0.8, 1.0]
   figsize: [10, 10]
   font_scale: 1.5
 
 pruning:
-  pruning_index: [8.95]
+  pruning_index: 2.3
   method: ${method}
   opt: 'sgd'
   finetune:
     after_pruning:
-      epochs: 600
+      epochs: 140
       lr: 0.01
-      lr_decay_milestones: "450, 550"
+      lr_decay_milestones: "80,120"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
     after_metanetwork:
-      epochs: 600
+      epochs: 100
       lr: 0.01
-      lr_decay_milestones: "450, 550"
+      lr_decay_milestones: "60,90"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
+
 
 
     
 
-  

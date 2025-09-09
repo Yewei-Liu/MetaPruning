@@ -1,30 +1,33 @@
 from functools import partial
 import torch
 import torch_pruning as tp
-
-
-dataset_num_classes_dict = {
-    'CIFAR10': 10,
-    'CIFAR100': 100,
-    'IMAGENET': 1000
-}
-
+from utils.dict import dataset_num_classes_dict
 
 def get_pruner(model, 
                example_inputs,
                reg,
                dataset_name,
+               method,
                iterative_steps=200,
                max_pruning_ratio=300,
-               method = "group_sl",
                global_pruning=True):
-    if method == "group_norm":
-        imp = tp.importance.GroupMagnitudeImportance(p=2)
+    
+    # For more infomation, please refer to code "https://github.com/VainF/Torch-Pruning/blob/master/torch_pruning/pruner/importance.py" and their corresponding paper.
+    if method == "random":
+        imp = tp.importance.RandomImportance()
         pruner_entry = partial(tp.pruner.GroupNormPruner, reg=reg, global_pruning=global_pruning)
-    elif method == "group_sl":
-        imp = tp.importance.GroupMagnitudeImportance(p=2, normalizer='max') # normalized by the maximum score for CIFAR
+    elif method == "group_l2_norm_no_normalizer":
+        imp = tp.importance.GroupMagnitudeImportance(p=2, group_reduction='mean', normalizer=None)
         pruner_entry = partial(tp.pruner.GroupNormPruner, reg=reg, global_pruning=global_pruning)
-    #args.is_accum_importance = is_accum_importance
+    elif method == "group_l2_norm_mean_normalizer":
+        imp = tp.importance.GroupMagnitudeImportance(p=2, group_reduction='mean', normalizer='mean')
+        pruner_entry = partial(tp.pruner.GroupNormPruner, reg=reg, global_pruning=global_pruning)
+    elif method == "group_l2_norm_max_normalizer":
+        imp = tp.importance.GroupMagnitudeImportance(p=2, group_reduction='mean', normalizer='max') 
+        pruner_entry = partial(tp.pruner.GroupNormPruner, reg=reg, global_pruning=global_pruning)
+    else:
+        raise NotImplementedError(f"Method {method} not implemented !")
+    
     unwrapped_parameters = []
     ignored_layers = []
     pruning_ratio_dict = {}

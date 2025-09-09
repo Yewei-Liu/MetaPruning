@@ -1,11 +1,13 @@
-model_name: VGG19
-dataset_name: CIFAR100
+model_name: resnet110
+dataset_name: CIFAR10
 big_batch_size: 500
 small_batch_size: 128
 num_workers: 4
-target: generate_dataset.VGG_generator.VGG19_on_CIFAR100_generator
-cfg:
-  initial_speed_up: 2.0 
+target: generate_dataset.resnet_generator.resnet110_on_CIFAR10_generator
+cfg: 
+  initial_speed_up: 2.0
   method: ${method}
   model_name: ${data_generator.model_name}
   dataset_name: ${data_generator.dataset_name}
+
+

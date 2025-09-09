@@ -1,5 +1,6 @@
 #!/bin/bash
 
+MODEL="resnet50"
 INDEX=0
 RUN_TYPE="prune"               
 SPEED_UP=1.2920
@@ -15,6 +16,7 @@ mkdir -p "save/${NAME}/${INDEX}/${RUN_TYPE}"
 CUDA_VISIBLE_DEVICES=${DEVICE} nohup \
 python main_imagenet.py \
     +experiment=$CONFIG_NAME \
+    model=$MODEL \
     no_distribution=True \
     run=$RUN_TYPE \
     speed_up=$SPEED_UP \

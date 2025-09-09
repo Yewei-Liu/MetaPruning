@@ -5,6 +5,7 @@ import time
 import warnings
 import registry
 from pathlib import Path
+import torch.distributed as dist
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from PIL import ImageFile
@@ -102,7 +103,7 @@ def meta_train_one_epoch(
 
     node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, origin_state_dict)
     model = state_dict_to_model(model_name, origin_state_dict, device)
-    pruner = get_pruner(model, torch.ones((1, 3, 224, 224)).to(device), cfg_meta_train.pruner_reg, "IMAGENET")
+    pruner = get_pruner(model, torch.ones((1, 3, 224, 224)).to(device), cfg_meta_train.pruner_reg, "IMAGENET", cfg.method)
 
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1, fmt="{value}"))
@@ -129,7 +130,7 @@ def meta_train_one_epoch(
                 for param in model.parameters():
                     if param.requires_grad:
                         param.grad = torch.zeros_like(param)
-                pruner.regularize(model)
+                pruner.regularize(model, alpha=cfg_meta_train.alpha, bias=cfg_meta_train.bias)
                 big_tensor = []
                 big_gradient = []
                 for name, param in model.named_parameters():
@@ -571,7 +572,7 @@ def visualize_acc_speed_up_curve(
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.gpu])
             model_without_ddp = model.module
         example_inputs = torch.randn(1, 3, 224, 224).to(device)
-        pruner = get_pruner(model, example_inputs, 0, "IMAGENET")
+        pruner = get_pruner(model, example_inputs, 0, "IMAGENET", cfg.method)
         base_ops, _ = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
         current_speed_up = 1.0
         acc1, acc5 = evaluate(model, criterion, test_loader, device)
@@ -625,9 +626,6 @@ def visualize_acc_speed_up_curve(
     plt.savefig(os.path.join(save_dir, name), dpi=300, bbox_inches='tight')
     plt.close()  # Close the figure to free memory
     print("End visualizing") 
-
-
-
 
 
 @hydra.main(config_path="configs", config_name="base", version_base=None)
@@ -685,8 +683,7 @@ def main(cfg: DictConfig) -> None:
     )
   
     if cfg.run == 'meta_train':
-        metanetwork_config = OmegaConf.select(cfg.metanetwork, str(cfg.level))
-        metanetwork = hydra.utils.instantiate(metanetwork_config).to(device)
+        metanetwork = hydra.utils.instantiate(cfg.metanetwork).to(device)
         if cfg.resume_epoch != -1:
             cfg.resume = os.path.join('save', f'{cfg.name}', 'meta_train', 'metanetwork', f"epoch_{cfg.resume_epoch}.pth")
         metanetwork = meta_train(cfg.data_model_num, metanetwork, cfg.meta_train.epochs, cfg.meta_train.lr, 
@@ -696,7 +693,7 @@ def main(cfg: DictConfig) -> None:
     elif cfg.run == 'prune': # no parallel
         ckpt = torch.load(os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'train_from_scratch', 'latest.pth'), weights_only=False)
         model = state_dict_to_model('resnet50', ckpt['model'])
-        speed_up, model = progressive_pruning(model, 'IMAGENET', data_loader, data_loader_test, cfg.speed_up, log=True, eval_train_data=False)
+        speed_up, model = progressive_pruning(model, 'IMAGENET', data_loader, data_loader_test, cfg.speed_up, cfg.method, log=True, eval_train_data=False)
         torch.save(model.state_dict(), os.path.join(cfg.output_dir, f'{speed_up:.4f}.pth'))
         print(model)
     
@@ -783,7 +780,7 @@ def main(cfg: DictConfig) -> None:
             pruned_ops, pruned_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
             current_speed_up = float(base_ops) / pruned_ops
             print(f'Origin speed up : {current_speed_up}')
-            speed_up, model = progressive_pruning(model, 'IMAGENET', data_loader, data_loader_test, cfg.speed_up / current_speed_up, log=True, eval_train_data=False, eval_test_data=False)
+            speed_up, model = progressive_pruning(model, 'IMAGENET', data_loader, data_loader_test, cfg.speed_up / current_speed_up, cfg.method, log=True, eval_train_data=False, eval_test_data=False)
             current_speed_up *= speed_up
             print(f"Current speed up : {current_speed_up}")
         else:
@@ -797,7 +794,12 @@ def main(cfg: DictConfig) -> None:
 
 
     elif cfg.run == 'train_from_scratch':
-        model = registry.get_model(num_classes=1000, name=cfg.model, pretrained=cfg.pretrained, target_dataset='imagenet').to(device)
+        if cfg.rank == 0:
+            model = registry.get_model(num_classes=1000, name=cfg.model, pretrained=cfg.pretrained, target_dataset='imagenet').to(device)
+            dist.barrier()
+        else:
+            dist.barrier()
+            model = registry.get_model(num_classes=1000, name=cfg.model, pretrained=cfg.pretrained, target_dataset='imagenet').to(device)
         train(
             model,
             cfg.epochs,

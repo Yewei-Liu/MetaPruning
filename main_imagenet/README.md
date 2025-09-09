@@ -67,6 +67,10 @@ Hyperparameters of `prune_after_metanetwork.sh` is as follows
 
 You can also do our experiments from scratch, generate data models, meta-train metanetworks and select the proper metanetwork for pruning. (This is the complete version of our experiments)
 
+### Get dataset
+
+Download ImageNet dataset and set `data_path` in ['base.yaml'](configs/base.yaml) as the path to your ImageNet.
+
 ### Generate data models
 
 We generate data models by finetuning the pytorch pretrained model by running :
