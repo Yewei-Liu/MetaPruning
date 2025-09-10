@@ -6,7 +6,7 @@
 #SBATCH -N 1
 #SBATCH --gres=gpu:8
 #SBATCH --time=48:00:00
-#SBATCH -c 8
+#SBATCH -c 64
 #SBATCH -o linkpred.out
 #SBATCH -e linkpred.err
 
