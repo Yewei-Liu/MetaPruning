@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -J liuyewei
+#SBATCH -J metapruning
 #SBATCH -p IAI_SLURM_HGX
 #SBATCH --qos=16gpu-hgx
 #SBATCH -N 1

@@ -22,3 +22,6 @@ nohup.out
 *.egg-info
 
 tmp/
+
+*.out
+*.err
