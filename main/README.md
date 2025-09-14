@@ -115,7 +115,7 @@ main/
 ├── final/           
 │   ├── resnet56_on_CIFAR10
 │   │   ├── group_l2_norm_max_normalizer
-│   │   │   └── rereproduce_3
+│   │   │   └── reproduce_3
 │   │   │       └── model.pth
 │   │   └── ... 
 │   └── ...  
@@ -129,7 +129,7 @@ main/
 ├── final/           
 │   ├── resnet56_on_CIFAR10
 │   │   ├── group_l2_norm_max_normalizer
-│   │   │   └── rereproduce_3
+│   │   │   └── reproduce_3
 │   │   │       ├── metanetwork.pth
 │   │   │       └── model.pth
 │   │   └── ... 

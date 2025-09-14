@@ -2,6 +2,7 @@ _recursive_: True
 
 model_name: VGG19
 task_name: ${task.model_name}_on_${task.dataset.dataset_name}
+initial_pruning_speed_up: 2.0
 
 dataset:
   dataset_name: CIFAR100
@@ -33,7 +34,7 @@ dataset_model:
 meta_train:
   epochs: 100
   lr : 0.001 
-  lr_decay_milestones : "10"
+  lr_decay_milestones : "15"
   lr_decay_gamma : 0.1
   weight_decay : 5e-4
   method : ${method}
@@ -81,15 +82,15 @@ pruning:
   opt: 'sgd'
   finetune:
     after_pruning:
-      epochs: 600
+      epochs: 2000
       lr: 0.01
-      lr_decay_milestones: "450, 550"
+      lr_decay_milestones: "1850, 1950"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
     after_metanetwork:
-      epochs: 600
+      epochs: 2000
       lr: 0.01
-      lr_decay_milestones: "450, 550"
+      lr_decay_milestones: "1850, 1950"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
 

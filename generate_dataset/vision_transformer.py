@@ -13,6 +13,8 @@ from torchvision.models._api import WeightsEnum, Weights
 from torchvision.models._meta import _IMAGENET_CATEGORIES
 from torchvision.models._utils import handle_legacy_interface, _ovewrite_named_param
 
+from utils.pruning import progressive_pruning
+
 
 __all__ = [
     "VisionTransformer",
@@ -628,6 +630,9 @@ def vit_b_16(*, weights: Optional[ViT_B_16_Weights] = None, progress: bool = Tru
         **kwargs,
     )
 
+def my_vit_b_16(node_num):
+    pass
+    
 
 @handle_legacy_interface(weights=("pretrained", ViT_B_32_Weights.IMAGENET1K_V1))
 def vit_b_32(*, weights: Optional[ViT_B_32_Weights] = None, progress: bool = True, **kwargs: Any) -> VisionTransformer:
@@ -853,7 +858,6 @@ model_urls = _ModelURLs(
 
 if __name__ == '__main__':
     model = vit_b_16(weights=ViT_B_16_Weights.IMAGENET1K_V1)
-    for key, val in model.state_dict().items():
-        print(key, val.shape)
-    
+    speed_up, model = progressive_pruning(model, "imagenet", None, None, 2.0, "group_l2_norm_max_normalizer", eval_test_data=False, eval_train_data=False)
+    print(model.state_dict())
     # print(model)

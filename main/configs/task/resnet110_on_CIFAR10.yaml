@@ -2,6 +2,7 @@ _recursive_: True
 
 model_name: resnet110
 task_name: ${task.model_name}_on_${task.dataset.dataset_name}
+initial_pruning_speed_up: 2.0
 
 dataset:
   dataset_name: CIFAR10
@@ -67,7 +68,7 @@ metanetwork:
   edge_res_ratio: 0.01
 
 visualize:
-  max_speed_up: 10.0
+  max_speed_up: 5.0
   marker: 'o'
   save_path: 'save/visualize/${task.dataset_model.dataset_model_name}/${method}/${name}/'
   ylim: [0.8, 1.0]

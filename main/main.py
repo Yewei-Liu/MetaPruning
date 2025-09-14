@@ -164,19 +164,14 @@ def main(cfg):
             print(f"Error: File '{file_path}' not found. Don't use metanetwork.")
             metanetwork = -1
 
-        if cfg.task_name in ['resnet56_on_CIFAR10', 'resnet56_on_CIFAR100', 'resnet56_on_SVHN']:
+        if cfg.task_name in ['resnet56_on_CIFAR10', 'resnet56_on_CIFAR100', 'resnet56_on_SVHN', 'resnet110_on_CIFAR10']:
             speed_up, model = progressive_pruning(model, cfg.dataset.dataset_name, big_train_loader, 
-                                                big_test_loader, 1.32, method=method, log=log)
-            current_speed_up *= speed_up
-            train(model, small_train_loader, big_test_loader, 80, 0.01, "40, 70", log=log)
-        elif cfg.task_name == 'resnet110_on_CIFAR10':
-            speed_up, model = progressive_pruning(model, cfg.dataset.dataset_name, big_train_loader, 
-                                                big_test_loader, 1.70, method=method, log=log)
+                                                big_test_loader, cfg.initial_pruning_speed_up, method=method, log=log)
             current_speed_up *= speed_up
             train(model, small_train_loader, big_test_loader, 80, 0.01, "40, 70", log=log)
         elif cfg.task_name == 'VGG19_on_CIFAR100':
             speed_up, model = progressive_pruning(model, cfg.dataset.dataset_name, big_train_loader, 
-                                                big_test_loader, 2.0, method=method, log=log)
+                                                big_test_loader, cfg.initial_pruning_speed_up, method=method, log=log)
             current_speed_up *= speed_up
             train(model, small_train_loader, big_test_loader, 140, 0.01, "80, 120", log=log) 
         else:
@@ -199,9 +194,14 @@ def main(cfg):
         metanetwork.eval().to(device)
         if cfg.task_name in ['resnet56_on_CIFAR10', 'resnet56_on_CIFAR100', 'resnet56_on_SVHN', 'resnet110_on_CIFAR10']:
             speed_up, model = progressive_pruning(model, cfg.dataset.dataset_name, big_train_loader, 
-                                                big_test_loader, 1.32, method=method, log=log)
+                                                big_test_loader, cfg.initial_pruning_speed_up, method=method, log=log)
             current_speed_up *= speed_up
             train(model, small_train_loader, big_test_loader, 80, 0.01, "40, 70", log=log)
+        elif cfg.task_name == 'VGG19_on_CIFAR100':
+            speed_up, model = progressive_pruning(model, cfg.dataset.dataset_name, big_train_loader, 
+                                                big_test_loader, cfg.initial_pruning_speed_up, method=method, log=log)
+            current_speed_up *= speed_up
+            train(model, small_train_loader, big_test_loader, 140, 0.01, "80, 120", log=log)
         else:
             raise NotImplementedError(f"task {cfg.task_name} is not supported for final visualization")
         model_list = [state_dict_to_model(cfg.model_name, model.state_dict())]
@@ -239,7 +239,7 @@ def main(cfg):
             torch.save(model, os.path.join(reproduce_dir, 'model.pth'))
         elif cfg.task_name == 'VGG19_on_CIFAR100':
             model = vgg19_bn(num_classes=100)
-            train(model, small_train_loader, big_test_loader, 200, 0.1, "100,150,180", log=log)
+            train(model, small_train_loader, big_test_loader, 200, 0.1, "100, 150, 180", log=log)
             torch.save(model, os.path.join(reproduce_dir, 'model.pth'))
         else:
             raise NotImplementedError(f"task {cfg.task_name} is not supported for pretrain final")
