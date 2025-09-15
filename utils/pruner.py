@@ -10,8 +10,12 @@ def get_pruner(model,
                method,
                iterative_steps=200,
                max_pruning_ratio=300,
-               global_pruning=True):
-    
+               global_pruning=True,
+               special_type=None,
+               ):
+    unwrapped_parameters = None
+    if special_type == 'vit':
+        unwrapped_parameters = [(model.encoder.pos_embedding, 2), (model.class_token, 2)]
     # For more infomation, please refer to code "https://github.com/VainF/Torch-Pruning/blob/master/torch_pruning/pruner/importance.py" and their corresponding paper.
     if method == "random":
         imp = tp.importance.RandomImportance()
@@ -28,7 +32,6 @@ def get_pruner(model,
     else:
         raise NotImplementedError(f"Method {method} not implemented !")
     
-    unwrapped_parameters = []
     ignored_layers = []
     pruning_ratio_dict = {}
     
@@ -43,6 +46,10 @@ def get_pruner(model,
         elif isinstance(m, torch.nn.modules.conv._ConvNd) and m.out_channels == num_classes:
             ignored_layers.append(m)
     
+    round_to = None
+    if special_type == 'vit':
+        round_to = model.encoder.layers[0].num_heads
+    
     # Here we fix iterative_steps=200 to prune the model progressively with small steps 
     # until the required speed up is achieved.
     pruner = pruner_entry(
@@ -54,6 +61,7 @@ def get_pruner(model,
         pruning_ratio_dict=pruning_ratio_dict,
         max_pruning_ratio=max_pruning_ratio,
         ignored_layers=ignored_layers,
+        round_to=round_to,
         unwrapped_parameters=unwrapped_parameters,
     )
     return pruner

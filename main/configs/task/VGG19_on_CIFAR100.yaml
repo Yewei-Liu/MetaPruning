@@ -64,8 +64,8 @@ metanetwork:
   hiddim: 32
   in_node_dim: 5
   in_edge_dim: 9
-  node_res_ratio: 0.01
-  edge_res_ratio: 0.01
+  node_res_ratio: 0.02
+  edge_res_ratio: 0.02
     
 
 visualize:

@@ -21,6 +21,7 @@ def progressive_pruning(
         device=None,
         eval_train_data=True,
         eval_test_data=True,
+        special_type=None,
 ):
     '''
     Pruning to a fixed speed up.
@@ -35,13 +36,15 @@ def progressive_pruning(
         example_inputs = torch.ones((1, 3, 224, 224)).to(device)
     else:
         raise NotImplementedError(f"Dataset {dataset_name} is not supported.")
-    pruner = get_pruner(model, example_inputs, 0.1, dataset_name, method=method)
+    pruner = get_pruner(model, example_inputs, 0.1, dataset_name, method=method, special_type=special_type)
     base_ops, _ = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
     current_speed_up = 1.0
     if log:
         logger = get_logger("Progressive pruning")
     while current_speed_up < speed_up :
         pruner.step()
+        if special_type == 'vit':
+            model.hidden_dim = model.conv_proj.out_channels
         pruned_ops, _ = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
         current_speed_up = float(base_ops) / pruned_ops
         if pruner.current_step == pruner.iterative_steps:
