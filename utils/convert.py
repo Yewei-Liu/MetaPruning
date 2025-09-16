@@ -845,18 +845,9 @@ if __name__ == "__main__":
     model = vit_b_16()
     origin_state_dict = model.state_dict()
     node_index, node_features, edge_index, edge_features_list = ViT_B_16_state_dict_to_graph(origin_state_dict, device='cpu')
-    new_state_dict = ViT_B_16_graph_to_state_dict(origin_state_dict, node_index, node_features, edge_index, edge_features_list, device='cpu')
-    for key1, key2 in zip(origin_state_dict.keys(), new_state_dict.keys()):
-        if not torch.equal(origin_state_dict[key1], new_state_dict[key2]):
-            print(f"Key {key1} not equal")
-    exit()
-
-    print(edge_index.T[:5])
-    print(res.state_dict()['conv1.weight'].shape)
-    cw = res.state_dict()['conv1.weight']
-    w = res.state_dict()['conv1.weight'].reshape(-1, 49)
-    print(cw.shape)
-    for i in range(5):
-        print(cw[edge_index.T[i][0] - 3, edge_index.T[i][1]].reshape(49))
-        print(w[i])
-        print()
+    node_num = [node_index[i] - node_index[i-1] for i in range(1, len(node_index))]
+    print(node_num)
+    print(len(node_num))
+    for i in range(len(node_num)):
+        if node_num[i] == 3072:
+            print(i)

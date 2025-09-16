@@ -381,7 +381,7 @@ class MyVisionTransformer(nn.Module):
         self.class_token = nn.Parameter(torch.zeros(1, 1, hidden_dim))
         seq_length += 1
 
-        self.encoder = Encoder(
+        self.encoder = MyEncoder(
             seq_length,
             num_layers,
             num_heads,
@@ -498,6 +498,26 @@ def _vision_transformer(
 
     return model
 
+def _my_vision_transformer(
+    patch_size: int,
+    num_layers: int,
+    num_heads: int,
+    hidden_dim: int,
+    mlp_dims: List[int],
+    progress: bool,
+    **kwargs: Any,
+) -> VisionTransformer:
+    image_size = kwargs.pop("image_size", 224)
+    model = MyVisionTransformer(
+        image_size=image_size,
+        patch_size=patch_size,
+        num_layers=num_layers,
+        num_heads=num_heads,
+        hidden_dim=hidden_dim,
+        mlp_dims=mlp_dims,
+        **kwargs,
+    )
+    return model
 
 _COMMON_META: Dict[str, Any] = {
     "categories": _IMAGENET_CATEGORIES,
@@ -790,8 +810,34 @@ def vit_b_16(*, weights: Optional[ViT_B_16_Weights] = None, progress: bool = Tru
         **kwargs,
     )
 
-def my_vit_b_16(node_num):
-    pass
+def my_vit_b_16(*, weights: Optional[ViT_B_16_Weights] = None, progress: bool = True, **kwargs: Any) -> MyVisionTransformer:
+    """
+    Pruned vit_b_16 of different sizes.
+    """
+    weights = ViT_B_16_Weights.verify(weights)
+
+    return _vision_transformer(
+        patch_size=16,
+        num_layers=12,
+        num_heads=12,
+        hidden_dim=768,
+        mlp_dim=3072,
+        weights=weights,
+        progress=progress,
+        **kwargs,
+    )
+
+def my_vit_b_16(node_num, progress: bool = True, **kwargs: Any) -> MyVisionTransformer:
+    mlp_dims = node_num[[4 * i for i in range(1, (len(node_num) + 1) / 4)]]
+    return _vision_transformer(
+        patch_size=16,
+        num_layers=12,
+        num_heads=12,
+        hidden_dim=768,
+        mlp_dim=mlp_dims,
+        progress=progress,
+        **kwargs,
+    )
     
 
 @handle_legacy_interface(weights=("pretrained", ViT_B_32_Weights.IMAGENET1K_V1))

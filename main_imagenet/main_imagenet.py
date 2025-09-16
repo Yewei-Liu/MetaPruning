@@ -667,7 +667,7 @@ def main(cfg: DictConfig) -> None:
         batch_size=cfg.batch_size,
         sampler=train_sampler,
         num_workers=cfg.workers,
-        pin_memory=True,
+        pin_memory=cfg.pin_memory,
         collate_fn=collate_fn,
     )
     big_data_loader = torch.utils.data.DataLoader(
@@ -675,11 +675,11 @@ def main(cfg: DictConfig) -> None:
         batch_size=cfg.big_batch_size,
         sampler=train_sampler,
         num_workers=cfg.workers,
-        pin_memory=True,
+        pin_memory=cfg.pin_memory,
         collate_fn=collate_fn,
     )
     data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=cfg.batch_size, sampler=test_sampler, num_workers=cfg.workers, pin_memory=True
+        dataset_test, batch_size=cfg.batch_size, sampler=test_sampler, num_workers=cfg.workers, pin_memory=cfg.pin_memory
     )
   
     if cfg.run == 'meta_train':
@@ -755,8 +755,7 @@ def main(cfg: DictConfig) -> None:
 
         print(f"Origin speed up : {base_ops / pruned_ops}")
         cfg.output_dir = savedir
-        cfg.lr_decay_milestones = "120,160,185"
-        model = train(model, 200, 0.01, 0, train_sampler, data_loader, data_loader_test, device, cfg, pruner=None, state_dict_only=True, save_every_epoch=True)
+        model = train(model, cfg.epochs, cfg.lr, 0, train_sampler, data_loader, data_loader_test, device, cfg, pruner=None, state_dict_only=True, save_every_epoch=True)
         
         model_list = [model, origin_model]
         label_list = ['after metanetwork', 'origin']
