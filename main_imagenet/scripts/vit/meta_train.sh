@@ -7,25 +7,28 @@
 #SBATCH --gres=gpu:8
 #SBATCH --time=48:00:00
 #SBATCH -c 64
-#SBATCH -o visualize.out
-#SBATCH -e visualize.err
+#SBATCH -o meta_train.out
+#SBATCH -e meta_train.err
 
 
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.__version__)"
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.is_available())"
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.device_count())"
 
-MODEL="resnet50"  
-INDEX=2
-METANETWORK_INDEX=12
-RUN_TYPE="visualize"                
-NAME=Large
-RESUME_EPOCH=-1
-LR=0.01
-EPOCHS=200
-LR_DECAY_MILESTONES=\'120,160,185\'
+MODEL="vit_b_16"  
+DATA_MODEL_NUM=2
+RUN_TYPE="meta_train"     
+NAME="Final_ViT"
+RESUME_EPOCH=1
+# metanetwork
+NUM_LAYER=6
+HIDDIM=16
+IN_NODE_DIM=8
+NODE_RES_RATIO=0.002
+EDGE_RES_RATIO=0.002
 
-NUM_GPUS=8                     
+
+NUM_GPUS=8
 MASTER_PORT=18900             
 CONFIG_NAME="base"              
         
@@ -43,7 +46,9 @@ export OMP_NUM_THREADS=4
 export NCCL_DEBUG=WARN
 export TORCH_DISTRIBUTED_DEBUG=INFO
 
-mkdir -p "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/"
+mkdir -p "save/${NAME}/${RUN_TYPE}"
+mkdir -p "save/${NAME}/${RUN_TYPE}/metanetwork"
+# save/Maybe/0/meta_train/metanetwork 
 
 torchrun \
     --nproc_per_node=$NUM_GPUS \
@@ -53,15 +58,14 @@ torchrun \
     --master_port=$MASTER_PORT \
     main_imagenet.py \
     +experiment=$CONFIG_NAME \
-    batch_size=32 \
-    big_batch_size=32 \
+    metanetwork.num_layer=$NUM_LAYER \
+    metanetwork.hiddim=$HIDDIM \
+    metanetwork.in_node_dim=$IN_NODE_DIM \
+    metanetwork.node_res_ratio=$NODE_RES_RATIO \
+    metanetwork.edge_res_ratio=$EDGE_RES_RATIO \
     model=$MODEL \
     run=$RUN_TYPE \
-    index=$INDEX \
-    name=$NAME \
+    data_model_num=$DATA_MODEL_NUM \
     resume_epoch=$RESUME_EPOCH \
-    lr=$LR \
-    lr_decay_milestones=$LR_DECAY_MILESTONES \
-    epochs=$EPOCHS \
-    +metanetwork_index=$METANETWORK_INDEX \
-    > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${INDEX}.log" 2>&1
+    name=$NAME \
+    > "save/${NAME}/${RUN_TYPE}/train.log" 2>&1

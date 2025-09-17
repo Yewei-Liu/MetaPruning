@@ -22,7 +22,6 @@ from torch.utils.data.dataloader import default_collate
 from torch.func import functional_call
 
 import torch_pruning as tp
-from functools import partial
 from omegaconf import DictConfig, OmegaConf
 import hydra
 
@@ -103,7 +102,7 @@ def meta_train_one_epoch(
 
     node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, origin_state_dict)
     model = state_dict_to_model(model_name, origin_state_dict, device)
-    pruner = get_pruner(model, torch.ones((1, 3, 224, 224)).to(device), cfg_meta_train.pruner_reg, "IMAGENET", cfg.method)
+    pruner = get_pruner(model, torch.ones((1, 3, 224, 224)).to(device), cfg_meta_train.pruner_reg, "IMAGENET", cfg.method, special_type=cfg.model.split('_')[0])
 
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1, fmt="{value}"))
@@ -572,7 +571,7 @@ def visualize_acc_speed_up_curve(
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.gpu])
             model_without_ddp = model.module
         example_inputs = torch.randn(1, 3, 224, 224).to(device)
-        pruner = get_pruner(model, example_inputs, 0, "IMAGENET", cfg.method)
+        pruner = get_pruner(model, example_inputs, 0, "IMAGENET", cfg.method, special_type=cfg.model.split('_')[0])
         base_ops, _ = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
         current_speed_up = 1.0
         acc1, acc5 = evaluate(model, criterion, test_loader, device)
@@ -693,7 +692,7 @@ def main(cfg: DictConfig) -> None:
     elif cfg.run == 'prune': # no parallel
         ckpt = torch.load(os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'train_from_scratch', 'latest.pth'), weights_only=False)
         model = state_dict_to_model('resnet50', ckpt['model'])
-        speed_up, model = progressive_pruning(model, 'IMAGENET', data_loader, data_loader_test, cfg.speed_up, cfg.method, log=True, eval_train_data=False)
+        speed_up, model = progressive_pruning(model, 'IMAGENET', data_loader, data_loader_test, cfg.speed_up, cfg.method, log=True, eval_train_data=False, special_type=cfg.model.split('_')[0])
         torch.save(model.state_dict(), os.path.join(cfg.output_dir, f'{speed_up:.4f}.pth'))
         print(model)
     
@@ -779,7 +778,7 @@ def main(cfg: DictConfig) -> None:
             pruned_ops, pruned_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
             current_speed_up = float(base_ops) / pruned_ops
             print(f'Origin speed up : {current_speed_up}')
-            speed_up, model = progressive_pruning(model, 'IMAGENET', data_loader, data_loader_test, cfg.speed_up / current_speed_up, cfg.method, log=True, eval_train_data=False, eval_test_data=False)
+            speed_up, model = progressive_pruning(model, 'IMAGENET', data_loader, data_loader_test, cfg.speed_up / current_speed_up, cfg.method, log=True, eval_train_data=False, eval_test_data=False, special_type=cfg.model.split('_')[0])
             current_speed_up *= speed_up
             print(f"Current speed up : {current_speed_up}")
         else:

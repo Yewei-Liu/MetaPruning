@@ -4,7 +4,7 @@ from copy import deepcopy
 from generate_dataset.resnet_family import MyResNet, resnet56
 from generate_dataset.VGG_family import MyVGG
 from generate_dataset.resnet_deep_family import MyResNetDeep, myresnet50
-from generate_dataset.vision_transformer import vit_b_16
+from generate_dataset.vision_transformer import vit_b_16, my_vit_b_16
 
 
 
@@ -17,6 +17,8 @@ def state_dict_to_graph(model_name, state_dict, device=None):
         return VGG19_state_dict_to_graph(state_dict, device)
     elif model_name == 'resnet50':
         return resnet50_state_dict_to_graph(state_dict, device)
+    elif model_name == 'vit_b_16':
+        return ViT_B_16_state_dict_to_graph(state_dict, device)
     else:
         raise ValueError(f"Model {model_name} not supported.")
 
@@ -29,6 +31,8 @@ def graph_to_state_dict(model_name, state_dict, node_index, node_features, edge_
         return VGG19_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
     elif model_name == 'resnet50':
         return resnet50_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
+    elif model_name == 'vit_b_16':
+        return ViT_B_16_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
     else:
         raise ValueError(f"Model {model_name} not supported.")
 
@@ -41,6 +45,8 @@ def state_dict_to_model(model_name, state_dict, device='cuda'):
         return VGG19_state_dict_to_model(state_dict, device)
     elif model_name == 'resnet50':
         return resnet50_state_dict_to_model(state_dict, device)
+    elif model_name == 'vit_b_16':
+        return ViT_B_16_state_dict_to_model(state_dict, device)
     else:
         raise ValueError(f"Model {model_name} not supported.")
 
@@ -840,14 +846,38 @@ def ViT_B_16_graph_to_state_dict(
         state_dict[key] = val.to(device)
     return state_dict
 
+def ViT_B_16_state_dict_to_model(state_dict, device):
+    node_index = [0, 3]
+    t = 0
+    for key, val in state_dict.items():
+        t += 1
+        if t == 2:
+            node_index.append(node_index[-1] + val.shape[0])
+        elif t <= 4:
+            continue
+        elif t <= 148:
+            if t % 12 == 7:
+                tmp_dim = len(val) // 3
+                node_index.append(node_index[-1] + tmp_dim)
+            elif t % 12 == 9:
+                node_index.append(node_index[-1] + val.shape[0])
+            elif t % 12 == 1:
+                node_index.append(node_index[-1] + val.shape[0])
+            elif t % 12 == 3:
+                node_index.append(node_index[-1] + val.shape[0])
+        elif t == 151:
+            node_index.append(node_index[-1] + val.shape[0])
+    node_num = [node_index[i + 1] - node_index[i] for i in range(len(node_index) - 1)]
+    vit = my_vit_b_16(node_num).eval().to(device)
+    vit.load_state_dict(state_dict)
+    return vit
 
 if __name__ == "__main__":
     model = vit_b_16()
     origin_state_dict = model.state_dict()
-    node_index, node_features, edge_index, edge_features_list = ViT_B_16_state_dict_to_graph(origin_state_dict, device='cpu')
-    node_num = [node_index[i] - node_index[i-1] for i in range(1, len(node_index))]
-    print(node_num)
-    print(len(node_num))
-    for i in range(len(node_num)):
-        if node_num[i] == 3072:
-            print(i)
+    # node_index, node_features, edge_index, edge_features_list = ViT_B_16_state_dict_to_graph(origin_state_dict, device='cpu')
+    new_model = ViT_B_16_state_dict_to_model(origin_state_dict, device='cpu')
+    for key in origin_state_dict.keys():
+        if not torch.equal(origin_state_dict[key], new_model.state_dict()[key]):
+            print(f"Key {key} not equal!")
+    print("Done!")

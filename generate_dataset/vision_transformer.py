@@ -810,31 +810,14 @@ def vit_b_16(*, weights: Optional[ViT_B_16_Weights] = None, progress: bool = Tru
         **kwargs,
     )
 
-def my_vit_b_16(*, weights: Optional[ViT_B_16_Weights] = None, progress: bool = True, **kwargs: Any) -> MyVisionTransformer:
-    """
-    Pruned vit_b_16 of different sizes.
-    """
-    weights = ViT_B_16_Weights.verify(weights)
-
-    return _vision_transformer(
-        patch_size=16,
-        num_layers=12,
-        num_heads=12,
-        hidden_dim=768,
-        mlp_dim=3072,
-        weights=weights,
-        progress=progress,
-        **kwargs,
-    )
-
 def my_vit_b_16(node_num, progress: bool = True, **kwargs: Any) -> MyVisionTransformer:
-    mlp_dims = node_num[[4 * i for i in range(1, (len(node_num) + 1) / 4)]]
-    return _vision_transformer(
+    mlp_dims = [node_num[4 * i] for i in range(1, (len(node_num) + 1) // 4)]
+    return _my_vision_transformer(
         patch_size=16,
         num_layers=12,
         num_heads=12,
-        hidden_dim=768,
-        mlp_dim=mlp_dims,
+        hidden_dim=node_num[1],
+        mlp_dims=mlp_dims,
         progress=progress,
         **kwargs,
     )
