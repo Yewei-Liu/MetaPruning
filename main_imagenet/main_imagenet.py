@@ -95,7 +95,7 @@ def meta_train_one_epoch(
     data_model_num, metanetwork, criterion, optimizer, big_data_loader, device, 
     epoch, cfg_meta_train, cfg
 ):
-    model_name = cfg.model_name
+    model_name = cfg.model
     metanetwork.train()
     index = cfg.rank % data_model_num
     ckpt = torch.load(os.path.join('save', f'{cfg.name}', 'meta_train', 'data_model', f'{index}.pth'), weights_only=False, map_location=device)
@@ -726,7 +726,7 @@ def main(cfg: DictConfig) -> None:
         savedir = os.path.join('save', f'{cfg.name}', 'visualize', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}')
         print('save dir : ', savedir)
         os.makedirs(savedir, exist_ok=True)
-        model_name = cfg.model_name
+        model_name = cfg.model
         example_inputs = torch.randn(1, 3, 224, 224).to(device)
         base_model = registry.get_model(num_classes=1000, name=cfg.model, pretrained=cfg.pretrained, target_dataset='imagenet').to(device)
         base_ops, base_params = tp.utils.count_ops_and_params(base_model, example_inputs=example_inputs)
@@ -768,7 +768,7 @@ def main(cfg: DictConfig) -> None:
         savedir = os.path.join('save', f'{cfg.name}', 'prune_after_metanetwork', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}', f'{cfg.speed_up:.4f}')
         print('save dir : ', savedir)
         os.makedirs(savedir, exist_ok=True)
-        model_name = cfg.model_name
+        model_name = cfg.model
         if cfg.resume_epoch == -1:
             example_inputs = torch.randn(1, 3, 224, 224).to(device)
             base_model = registry.get_model(num_classes=1000, name=cfg.model, pretrained=cfg.pretrained, target_dataset='imagenet').to(device)
