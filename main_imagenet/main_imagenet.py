@@ -720,7 +720,14 @@ def main(cfg: DictConfig) -> None:
             state_dict_only=True,
             save_every_epoch=True,
         )
-
+        
+    elif cfg.run == "visualize_origin":
+        savedir = os.path.join('save', f'{cfg.name}', 'visualize', f'{cfg.index}')
+        ckpt = torch.load(os.path.join('save', f'{cfg.name}', 'meta_train', 'data_model', f'{cfg.index}.pth'), weights_only=False, map_location=device)
+        origin_state_dict = ckpt['model']
+        origin_model = state_dict_to_model(model_name, origin_state_dict, device)
+        visualize_acc_speed_up_curve(origin_model, 'origin', data_loader_test, 1.0, cfg, max_speed_up=2.5,
+                                     save_dir=savedir, name=f'origin_visualize.png', ylim=(0.0, 1.0))   
         
     elif cfg.run == 'visualize':
         savedir = os.path.join('save', f'{cfg.name}', 'visualize', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}')

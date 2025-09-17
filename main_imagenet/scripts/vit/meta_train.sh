@@ -22,7 +22,7 @@ NAME="Final_ViT"
 RESUME_EPOCH=-1
 # metanetwork
 TARGET=nn.GNN.MyGNN_ViT
-NUM_LAYER=2
+NUM_LAYER=3
 HIDDIM=4
 IN_NODE_DIM=6
 NODE_RES_RATIO=0.001
@@ -61,6 +61,7 @@ torchrun \
     --master_port=$MASTER_PORT \
     main_imagenet.py \
     +experiment=$CONFIG_NAME \
+    metanetwork._target_=$TARGET \
     metanetwork.num_layer=$NUM_LAYER \
     metanetwork.hiddim=$HIDDIM \
     metanetwork.in_node_dim=$IN_NODE_DIM \
