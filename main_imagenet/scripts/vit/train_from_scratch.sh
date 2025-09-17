@@ -13,12 +13,12 @@
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.device_count())"
 nvidia-smi
 MODEL="vit_b_16"  
-INDEX=0
+INDEX=1
 RUN_TYPE="train_from_scratch"                 
 NAME="Final_ViT"
 PRETRAINED=True
-EPOCHS=100
-LR=0.0001
+EPOCHS=1
+LR=0.0
 LR_DECAY_MILESTOMES=\'10000\'
 NUM_GPUS=8                 
 MASTER_PORT=18900             

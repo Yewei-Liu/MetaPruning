@@ -19,7 +19,7 @@ MODEL="vit_b_16"
 DATA_MODEL_NUM=1
 RUN_TYPE="meta_train"     
 NAME="Final_ViT"
-RESUME_EPOCH=1
+RESUME_EPOCH=-1
 # metanetwork
 TARGET=nn.GNN.MyGNN_ViT
 NUM_LAYER=2
@@ -67,7 +67,7 @@ torchrun \
     metanetwork.node_res_ratio=$NODE_RES_RATIO \
     metanetwork.edge_res_ratio=$EDGE_RES_RATIO \
     meta_train.lr=$METATRAIN_LR \
-    meta_train.lr_decay_milestones=$METATRAIN_LR_DECAY_MILESTOMES \
+    meta_train.lr_decay_milestones=$METATRAIN_LR_DECAY_MILESTONES \
     data_model_num=$DATA_MODEL_NUM \
     model=$MODEL \
     run=$RUN_TYPE \

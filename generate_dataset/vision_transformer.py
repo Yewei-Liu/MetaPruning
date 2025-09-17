@@ -1046,6 +1046,6 @@ model_urls = _ModelURLs(
 )
 
 if __name__ == '__main__':
-    model = vit_b_16(weights=ViT_B_16_Weights.IMAGENET1K_V1)
+    model = vit_b_16(pretrained=True)
 
     # print(model)

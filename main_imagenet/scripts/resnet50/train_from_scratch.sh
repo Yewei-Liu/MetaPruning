@@ -21,7 +21,7 @@ nvidia-smi
 MODEL="resnet50"  
 INDEX=0
 RUN_TYPE="train_from_scratch"                 
-NAME=Final 
+NAME=ViTDataModel
 PRETRAINED=True
 EPOCHS=30
 LR=0.01
