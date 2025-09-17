@@ -723,7 +723,7 @@ def main(cfg: DictConfig) -> None:
         
     elif cfg.run == "visualize_origin":
         model_name = cfg.model
-        savedir = os.path.join('save', f'{cfg.name}', 'visualize', f'{cfg.index}')
+        savedir = os.path.join('save', f'{cfg.name}', 'visualize_origin', f'{cfg.index}')
         ckpt = torch.load(os.path.join('save', f'{cfg.name}', 'meta_train', 'data_model', f'{cfg.index}.pth'), weights_only=False, map_location=device)
         origin_state_dict = ckpt['model']
         origin_model = state_dict_to_model(model_name, origin_state_dict, device)
