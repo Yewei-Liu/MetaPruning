@@ -583,7 +583,7 @@ def visualize_acc_speed_up_curve(
         while current_speed_up < max_speed_up / base_speed_up:
             pruner.step()
             if special_type == 'vit':
-                model.hidden_dim = model.conv_proj.out_channels
+                model.module.hidden_dim = model.module.conv_proj.out_channels
             pruned_ops, _ = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
             acc1, acc5 = evaluate(model, criterion, test_loader, device)
             current_speed_up = float(base_ops) / pruned_ops
