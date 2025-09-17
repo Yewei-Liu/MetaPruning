@@ -75,7 +75,7 @@ def get_pruner(model,
     # --- ViT rounding (e.g., keep heads divisible) ---
     round_to = None
     if special_type == 'vit':
-        round_to = model.encoder.layers[0].num_heads
+        round_to = base_model.encoder.layers[0].num_heads
     
     # --- build pruner on the unwrapped model ---
     pruner = pruner_entry(
