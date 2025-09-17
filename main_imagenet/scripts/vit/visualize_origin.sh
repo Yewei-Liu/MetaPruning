@@ -15,7 +15,7 @@
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.is_available())"
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.device_count())"
 
-MODEL="resnet50"  
+MODEL="vit_b_16"  
 INDEX=1
 RUN_TYPE="visualize_origin"                
 NAME="Final_ViT"
