@@ -551,7 +551,7 @@ def visualize_acc_speed_up_curve(
         save_dir ='tmp/',
         name = 'tmp.png',
         ylim = (0.0, 1.0),
-        font_scale = 1.5
+        font_scale = 1.5,
 ):
     def get_acc_speed_up_list(
         model,
@@ -572,7 +572,8 @@ def visualize_acc_speed_up_curve(
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.gpu])
             model_without_ddp = model.module
         example_inputs = torch.randn(1, 3, 224, 224).to(device)
-        pruner = get_pruner(model, example_inputs, 0, "IMAGENET", cfg.method, special_type=cfg.model.split('_')[0])
+        special_type=cfg.model.split('_')[0]
+        pruner = get_pruner(model, example_inputs, 0, "IMAGENET", cfg.method, special_type=special_type)
         base_ops, _ = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
         current_speed_up = 1.0
         acc1, acc5 = evaluate(model, criterion, test_loader, device)
@@ -581,6 +582,8 @@ def visualize_acc_speed_up_curve(
         speed_up_list = [base_speed_up]
         while current_speed_up < max_speed_up / base_speed_up:
             pruner.step()
+            if special_type == 'vit':
+                model.hidden_dim = model.conv_proj.out_channels
             pruned_ops, _ = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
             acc1, acc5 = evaluate(model, criterion, test_loader, device)
             current_speed_up = float(base_ops) / pruned_ops
