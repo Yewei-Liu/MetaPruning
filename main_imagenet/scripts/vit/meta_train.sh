@@ -21,13 +21,15 @@ RUN_TYPE="meta_train"
 NAME="Final_ViT"
 RESUME_EPOCH=1
 # metanetwork
-TARGET
+TARGET=nn.GNN.MyGNN_ViT
 NUM_LAYER=2
 HIDDIM=4
 IN_NODE_DIM=6
 NODE_RES_RATIO=0.001
 EDGE_RES_RATIO=0.001
-
+# meta train
+METATRAIN_LR=0.01
+METATRAIN_LR_DECAY_MILESTONES=\'10000\'
 
 NUM_GPUS=8
 MASTER_PORT=18900             
@@ -64,6 +66,8 @@ torchrun \
     metanetwork.in_node_dim=$IN_NODE_DIM \
     metanetwork.node_res_ratio=$NODE_RES_RATIO \
     metanetwork.edge_res_ratio=$EDGE_RES_RATIO \
+    meta_train.lr=$LR \
+    meta_train.lr_decay_milestones=$LR_DECAY_MILESTOMES \
     model=$MODEL \
     run=$RUN_TYPE \
     data_model_num=$DATA_MODEL_NUM \
