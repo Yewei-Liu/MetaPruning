@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH -J metapruning
-#SBATCH -p IAI_SLURM_HGX
-#SBATCH --qos=16gpu-hgx
+#SBATCH -p IAI_SLURM_3090
+#SBATCH --qos=8gpu
 #SBATCH -N 1
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:8
 #SBATCH --time=48:00:00
 #SBATCH -c 64
 #SBATCH -o tmp.out
@@ -18,13 +18,13 @@ RUN_TYPE="train_from_scratch"
 NAME="Final_ViT"
 PRETRAINED=True
 EPOCHS=100
-LR=0.001
+LR=0.0001
 LR_DECAY_MILESTOMES=\'10000\'
-NUM_GPUS=4                   
+NUM_GPUS=8                 
 MASTER_PORT=18900             
 CONFIG_NAME="base"   
 OPT="adamw"           
-BATCH_SIZE=256
+BATCH_SIZE=128
 BIG_BATCH_SIZE=64
 WEIGHT_DECAY=0.3      
         

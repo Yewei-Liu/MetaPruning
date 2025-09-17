@@ -16,7 +16,7 @@
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.device_count())"
 
 MODEL="vit_b_16"  
-DATA_MODEL_NUM=2
+DATA_MODEL_NUM=1
 RUN_TYPE="meta_train"     
 NAME="Final_ViT"
 RESUME_EPOCH=1
@@ -66,11 +66,11 @@ torchrun \
     metanetwork.in_node_dim=$IN_NODE_DIM \
     metanetwork.node_res_ratio=$NODE_RES_RATIO \
     metanetwork.edge_res_ratio=$EDGE_RES_RATIO \
-    meta_train.lr=$LR \
-    meta_train.lr_decay_milestones=$LR_DECAY_MILESTOMES \
+    meta_train.lr=$METATRAIN_LR \
+    meta_train.lr_decay_milestones=$METATRAIN_LR_DECAY_MILESTOMES \
+    data_model_num=$DATA_MODEL_NUM \
     model=$MODEL \
     run=$RUN_TYPE \
-    data_model_num=$DATA_MODEL_NUM \
     resume_epoch=$RESUME_EPOCH \
     name=$NAME \
     > "save/${NAME}/${RUN_TYPE}/train.log" 2>&1

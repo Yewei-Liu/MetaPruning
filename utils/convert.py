@@ -770,7 +770,7 @@ def ViT_B_16_graph_to_state_dict(
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     state_dict = deepcopy(origin_state_dict)
     node_num = [node_index[i] - node_index[i-1] for i in range(1, len(node_index))]
-    edge_features_256, edge_features_3, edge_features_1 = edge_features_list
+    edge_features_256, edge_features_3, edge_features_1 = edge_features
     
     state_dict['conv_proj.weight'] = edge_features_256.reshape(node_num[1], node_num[0], 16, 16)
     state_dict['conv_proj.bias'] = node_features[node_index[1]: node_index[2]][:, 2]
