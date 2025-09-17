@@ -62,7 +62,6 @@ class MyGNN_resnet50(nn.Module):
         self.edge_res_ratio = edge_res_ratio
         self.nodeEnc = nn.Linear(in_node_dim, hiddim)
         
-
         self.convs = nn.ModuleList([PNAConv(hiddim) for _ in range(num_layer)])
         self.norm = nn.LayerNorm(hiddim, elementwise_affine=False)
 
@@ -102,29 +101,27 @@ class MyGNN_ViT(nn.Module):
         super().__init__()
         self.node_res_ratio = node_res_ratio
         self.edge_res_ratio = edge_res_ratio
-        self.nodeEnc_0 = nn.Linear(in_node_dim, hiddim)
-        self.nodeEnc_1 = nn.Linear(in_node_dim, hiddim)
-        
-
+        self.nodeEnc = nn.Linear(in_node_dim, hiddim)
+    
         self.convs = nn.ModuleList([PNAConv(hiddim) for _ in range(num_layer)])
         self.norm = nn.LayerNorm(hiddim, elementwise_affine=False)
 
         self.num_layer = num_layer
         self.mlps = nn.ModuleList([nn.Sequential(nn.Linear(hiddim, hiddim), nn.SiLU(inplace=True))for _ in range(num_layer)])
-        self.edgeEnc_49 = nn.Linear(49, hiddim)
-        self.edgeEnc_9 = nn.Linear(9, hiddim)
+        self.edgeEnc_256 = nn.Linear(256, hiddim)
+        self.edgeEnc_3 = nn.Linear(3, hiddim)
         self.edgeEnc_1 = nn.Linear(1, hiddim)
         self.register_buffer("edgeInverter", torch.concat((torch.ones((hiddim//2,)), -torch.ones(((hiddim+1)//2,))), dim=0))
-        self.edgeDec_49 = nn.Sequential(nn.LayerNorm(hiddim, elementwise_affine=False), nn.Linear(hiddim, hiddim), nn.SiLU(inplace=True), nn.Linear(hiddim, 49))
-        self.edgeDec_9 = nn.Sequential(nn.LayerNorm(hiddim, elementwise_affine=False), nn.Linear(hiddim, hiddim), nn.SiLU(inplace=True), nn.Linear(hiddim, 9))
+        self.edgeDec_256 = nn.Sequential(nn.LayerNorm(hiddim, elementwise_affine=False), nn.Linear(hiddim, hiddim), nn.SiLU(inplace=True), nn.Linear(hiddim, 256))
+        self.edgeDec_3 = nn.Sequential(nn.LayerNorm(hiddim, elementwise_affine=False), nn.Linear(hiddim, hiddim), nn.SiLU(inplace=True), nn.Linear(hiddim, 3))
         self.edgeDec_1 = nn.Sequential(nn.LayerNorm(hiddim, elementwise_affine=False), nn.Linear(hiddim, hiddim), nn.SiLU(inplace=True), nn.Linear(hiddim, 1))
-        self.edgeDec = [self.edgeDec_49, self.edgeDec_9, self.edgeDec_1]
+        self.edgeDec = [self.edgeDec_256, self.edgeDec_3, self.edgeDec_1]
         self.nodeDec = nn.Sequential(nn.LayerNorm(hiddim, elementwise_affine=False), nn.Linear(hiddim, hiddim), nn.SiLU(inplace=True), nn.Linear(hiddim, in_node_dim))
 
     def forward(self, x: Tensor, edge_index: Tensor, edge_attr_list: Tensor):
         hidden = self.nodeEnc(x)
         edge_num = [len(i) for i in edge_attr_list]
-        edge_attr = torch.concatenate([self.edgeEnc_49(edge_attr_list[0]), self.edgeEnc_9(edge_attr_list[1]), self.edgeEnc_1(edge_attr_list[2])], dim=0)
+        edge_attr = torch.concatenate([self.edgeEnc_256(edge_attr_list[0]), self.edgeEnc_3(edge_attr_list[1]), self.edgeEnc_1(edge_attr_list[2])], dim=0)
         for i in range(self.num_layer):
             ret_node1, ret_edge1 = self.convs[i].forward(self.norm(hidden), edge_index, edge_attr) 
             ret_node2, ret_edge2 = self.convs[i].forward(self.norm(hidden), edge_index[[1, 0]], self.edgeInverter * edge_attr)
