@@ -31,8 +31,6 @@ from utils.convert import state_dict_to_graph, graph_to_state_dict, state_dict_t
 from utils.pruner import get_pruner
 from utils.pruning import progressive_pruning
 
-from generate_dataset.resnet_deep_family import resnet50
-
 
 def prune_to_target_flops(pruner, model, target_flops, example_inputs, cfg):
     model.eval()
@@ -695,7 +693,7 @@ def main(cfg: DictConfig) -> None:
 
     elif cfg.run == 'prune': # no parallel
         ckpt = torch.load(os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'train_from_scratch', 'latest.pth'), weights_only=False)
-        model = state_dict_to_model('resnet50', ckpt['model'])
+        model = state_dict_to_model(cfg.model, ckpt['model'])
         speed_up, model = progressive_pruning(model, 'IMAGENET', data_loader, data_loader_test, cfg.speed_up, cfg.method, log=True, eval_train_data=False, special_type=cfg.model.split('_')[0])
         torch.save(model.state_dict(), os.path.join(cfg.output_dir, f'{speed_up:.4f}.pth'))
         print(model)
@@ -705,7 +703,7 @@ def main(cfg: DictConfig) -> None:
         pth_files = list(Path(dir).glob('*.pth'))
         assert len(pth_files) == 1, f'Only one pth file is expected in {dir}, but got {len(pth_files)}'
         state_dict = torch.load(pth_files[0], map_location=device, weights_only=False)
-        model = state_dict_to_model('resnet50', state_dict, device)
+        model = state_dict_to_model(cfg.model, state_dict, device)
         del state_dict
         if cfg.resume_epoch != -1:
             cfg.resume = os.path.join('save', f'{cfg.name}', f'{cfg.index}', 'finetune', f'epoch_{cfg.resume_epoch}.pth')
@@ -754,13 +752,13 @@ def main(cfg: DictConfig) -> None:
             node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, origin_state_dict, device)
             node_pred, edge_pred = metanetwork.forward(node_features, edge_index, edge_features_list)
             state_dict = graph_to_state_dict(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
-            model = state_dict_to_model('resnet50', state_dict, device)
+            model = state_dict_to_model(cfg.model, state_dict, device)
             del state_dict, node_index, node_features, edge_index, edge_features_list, node_pred, edge_pred
             pruned_ops, pruned_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
         else:
             cfg.resume = os.path.join('save', f'{cfg.name}', 'visualize', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}', f'epoch_{cfg.resume_epoch}.pth')
             ckpt = torch.load(cfg.resume, weights_only=False, map_location=device)
-            model = state_dict_to_model('resnet50', ckpt['model'], device)
+            model = state_dict_to_model(cfg.model, ckpt['model'], device)
             pruned_ops, pruned_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
 
 

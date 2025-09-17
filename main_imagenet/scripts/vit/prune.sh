@@ -18,12 +18,11 @@
 
 
 MODEL="vit_b_16"
-INDEX=0
+INDEX=1
 RUN_TYPE="prune"               
 SPEED_UP=1.1
 NAME="Final_ViT"
-PRETRAINED=True
-DEVICE=0      
+PRETRAINED=True    
 CONFIG_NAME="base"              
         
 export HYDRA_FULL_ERROR=1
