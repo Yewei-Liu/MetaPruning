@@ -18,7 +18,7 @@
 MODEL="resnet50"  
 INDEX=1
 RUN_TYPE="visualize_origin"                
-NAME=ViT_Final
+NAME="Final_ViT"
 
 NUM_GPUS=8                     
 MASTER_PORT=18900             
@@ -38,7 +38,7 @@ export OMP_NUM_THREADS=4
 export NCCL_DEBUG=WARN
 export TORCH_DISTRIBUTED_DEBUG=INFO
 
-mkdir -p "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/"
+mkdir -p "save/${NAME}/${RUN_TYPE}/"
 
 torchrun \
     --nproc_per_node=$NUM_GPUS \
@@ -54,4 +54,4 @@ torchrun \
     run=$RUN_TYPE \
     index=$INDEX \
     name=$NAME \
-    > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${INDEX}.log" 2>&1
+    > "save/${NAME}/${RUN_TYPE}/${INDEX}.log" 2>&1
