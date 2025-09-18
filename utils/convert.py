@@ -756,7 +756,7 @@ def ViT_B_16_state_dict_to_graph(state_dict, device=None):
         
     edge_index = torch.concatenate([edge_index_256, edge_index_3, edge_index_1], dim=0).T
     edge_features_list = [edge_features_256.to(device), edge_features_3.to(device), edge_features_1.to(device)]
-    return node_index, node_features, edge_index.to(device), edge_features_list
+    return node_index, node_features.to(device), edge_index.to(device), edge_features_list
 
 def ViT_B_16_graph_to_state_dict(
         origin_state_dict,

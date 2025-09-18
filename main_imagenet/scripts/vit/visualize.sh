@@ -1,10 +1,10 @@
 #!/bin/bash
 
 #SBATCH -J metapruning
-#SBATCH -p IAI_SLURM_3090
-#SBATCH --qos=8gpu
+#SBATCH -p IAI_SLURM_HGX
+#SBATCH --qos=16gpu-hgx
 #SBATCH -N 1
-#SBATCH --gres=gpu:8
+#SBATCH --gres=gpu:4
 #SBATCH --time=48:00:00
 #SBATCH -c 64
 #SBATCH -o visualize.out
@@ -17,7 +17,7 @@
 
 MODEL="vit_b_16"  
 INDEX=1
-METANETWORK_INDEX=11
+METANETWORK_INDEX=3
 RUN_TYPE="visualize"                
 NAME=Final_ViT
 RESUME_EPOCH=-1
@@ -25,7 +25,7 @@ LR=0.01
 EPOCHS=0
 LR_DECAY_MILESTONES=\'120,160,185\'
 
-NUM_GPUS=8                     
+NUM_GPUS=4                
 MASTER_PORT=18900             
 CONFIG_NAME="base"              
         
