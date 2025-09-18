@@ -585,7 +585,7 @@ def visualize_acc_speed_up_curve(
             pruned_ops, _ = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
             acc1, acc5 = evaluate(model, criterion, test_loader, device)
             current_speed_up = float(base_ops) / pruned_ops
-            print(f"Speed up: {current_speed_up*base_speed_up:.2f}")
+            print(f"Speed up: {current_speed_up*base_speed_up:.4f}")
             acc1_list.append(acc1 / 100)
             acc5_list.append(acc5 / 100)
             speed_up_list.append(current_speed_up * base_speed_up)
