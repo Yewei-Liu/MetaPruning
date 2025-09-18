@@ -1,10 +1,20 @@
 #!/bin/bash
 
+#SBATCH -J metapruning
+#SBATCH -p IAI_SLURM_3090
+#SBATCH --qos=8gpu
+#SBATCH -N 1
+#SBATCH --gres=gpu:8
+#SBATCH --time=48:00:00
+#SBATCH -c 64
+#SBATCH -o tmp.out
+#SBATCH -e tmp.err
+
 MODEL="resnet50"  
 INDEX=2
-METANETWORK_INDEX=13
+METANETWORK_INDEX=12
 RUN_TYPE="prune_after_metanetwork"                
-NAME=Final 
+NAME=Large 
 SPEED_UP=2.3095
 RESUME_EPOCH=-1
 
@@ -23,10 +33,12 @@ done
 
 export HYDRA_FULL_ERROR=1
 export OMP_NUM_THREADS=4
+export NCCL_DEBUG=WARN
+export TORCH_DISTRIBUTED_DEBUG=INFO
 
 mkdir -p "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${SPEED_UP}/"
 
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup \
+
 torchrun \
     --nproc_per_node=$NUM_GPUS \
     --nnodes=1 \
@@ -42,4 +54,4 @@ torchrun \
     speed_up=$SPEED_UP \
     resume_epoch=$RESUME_EPOCH \
     +metanetwork_index=$METANETWORK_INDEX \
-    > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${SPEED_UP}/prune.log" &
+    > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${SPEED_UP}/prune.log" 2>&1

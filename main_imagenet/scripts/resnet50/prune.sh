@@ -9,7 +9,6 @@
 #SBATCH -c 64
 #SBATCH -o tmp.out
 #SBATCH -e tmp.err
-#SBATCH --nodelist=hgx004
 
 
 MODEL="resnet50"

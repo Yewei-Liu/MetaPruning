@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH -J metapruning
-#SBATCH -p IAI_SLURM_3090
-#SBATCH --qos=8gpu
+#SBATCH -p IAI_SLURM_HGX
+#SBATCH --qos=16gpu-hgx
 #SBATCH -N 1
 #SBATCH --gres=gpu:8
 #SBATCH --time=48:00:00
@@ -15,7 +15,7 @@
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.device_count())"
 
 MODEL="vit_b_16"            
-INDEX=1
+INDEX=0
 RUN_TYPE="finetune"                 
 NAME="Final_ViT"
 EPOCHS=30

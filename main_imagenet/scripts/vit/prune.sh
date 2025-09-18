@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH -J metapruning
-#SBATCH -p IAI_SLURM_3090
-#SBATCH --qos=8gpu
+#SBATCH -p IAI_SLURM_HGX
+#SBATCH --qos=16gpu-hgx
 #SBATCH -N 1
 #SBATCH --gres=gpu:1
 #SBATCH --time=48:00:00
@@ -18,11 +18,11 @@
 
 
 MODEL="vit_b_16"
-INDEX=1
+INDEX=2
 RUN_TYPE="prune"               
-SPEED_UP=1.1
+SPEED_UP=1.03
 NAME="Final_ViT"
-PRETRAINED=True    
+PRETRAINED=True
 CONFIG_NAME="base"              
         
 export HYDRA_FULL_ERROR=1
