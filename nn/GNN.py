@@ -108,11 +108,11 @@ class MyGNN_ViT(nn.Module):
 
         self.num_layer = num_layer
         self.mlps = nn.ModuleList([nn.Sequential(nn.Linear(hiddim, hiddim), nn.SiLU(inplace=True))for _ in range(num_layer)])
-        self.edgeEnc_256 = nn.Linear(256, hiddim)
+        self.edgeEnc_256 = nn.Sequential(nn.Linear(256, 64), nn.Linear(64, hiddim))
         self.edgeEnc_3 = nn.Linear(3, hiddim)
         self.edgeEnc_1 = nn.Linear(1, hiddim)
         self.register_buffer("edgeInverter", torch.concat((torch.ones((hiddim//2,)), -torch.ones(((hiddim+1)//2,))), dim=0))
-        self.edgeDec_256 = nn.Sequential(nn.LayerNorm(hiddim, elementwise_affine=False), nn.Linear(hiddim, hiddim), nn.SiLU(inplace=True), nn.Linear(hiddim, 256))
+        self.edgeDec_256 = nn.Sequential(nn.LayerNorm(hiddim, elementwise_affine=False), nn.Linear(hiddim, hiddim), nn.SiLU(inplace=True), nn.Linear(hiddim, 64), nn.Linear(64, 256))
         self.edgeDec_3 = nn.Sequential(nn.LayerNorm(hiddim, elementwise_affine=False), nn.Linear(hiddim, hiddim), nn.SiLU(inplace=True), nn.Linear(hiddim, 3))
         self.edgeDec_1 = nn.Sequential(nn.LayerNorm(hiddim, elementwise_affine=False), nn.Linear(hiddim, hiddim), nn.SiLU(inplace=True), nn.Linear(hiddim, 1))
         self.edgeDec = [self.edgeDec_256, self.edgeDec_3, self.edgeDec_1]
