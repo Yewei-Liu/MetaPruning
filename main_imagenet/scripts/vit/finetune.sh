@@ -15,13 +15,14 @@
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.device_count())"
 
 MODEL="vit_b_16"            
-INDEX=0
+INDEX=2
 RUN_TYPE="finetune"                 
 NAME="Final_ViT"
-EPOCHS=30
-LR=0.001
+EPOCHS=1
+LR=0.0
 LR_DECAY_MILESTOMES=\'15,25\'
 RESUME_EPOCH=-1
+BATCH_SIZE=128
 
 NUM_GPUS=8                     
 MASTER_PORT=18900             
@@ -60,4 +61,5 @@ torchrun \
     lr=$LR \
     resume_epoch=$RESUME_EPOCH \
     lr_decay_milestones=$LR_DECAY_MILESTOMES \
+    batch_size=$BATCH_SIZE \
     > "save/${NAME}/${INDEX}/${RUN_TYPE}/finetune.log" 2>&1

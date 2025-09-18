@@ -16,9 +16,14 @@
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.device_count())"
 
 MODEL="vit_b_16"  
-INDEX=0
-RUN_TYPE="visualize_origin"                
-NAME="Final_ViT"
+INDEX=1
+METANETWORK_INDEX=11
+RUN_TYPE="visualize"                
+NAME=Final_ViT
+RESUME_EPOCH=-1
+LR=0.01
+EPOCHS=0
+LR_DECAY_MILESTONES=\'120,160,185\'
 
 NUM_GPUS=8                     
 MASTER_PORT=18900             
@@ -38,7 +43,7 @@ export OMP_NUM_THREADS=4
 export NCCL_DEBUG=WARN
 export TORCH_DISTRIBUTED_DEBUG=INFO
 
-mkdir -p "save/${NAME}/${RUN_TYPE}/"
+mkdir -p "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/"
 
 torchrun \
     --nproc_per_node=$NUM_GPUS \
@@ -54,4 +59,9 @@ torchrun \
     run=$RUN_TYPE \
     index=$INDEX \
     name=$NAME \
-    > "save/${NAME}/${RUN_TYPE}/${INDEX}.log" 2>&1
+    resume_epoch=$RESUME_EPOCH \
+    lr=$LR \
+    lr_decay_milestones=$LR_DECAY_MILESTONES \
+    epochs=$EPOCHS \
+    +metanetwork_index=$METANETWORK_INDEX \
+    > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${INDEX}.log" 2>&1
