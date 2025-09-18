@@ -30,6 +30,7 @@ EDGE_RES_RATIO=0.05
 # meta train
 METATRAIN_LR=0.01
 METATRAIN_LR_DECAY_MILESTONES=\'10000\'
+PRUNER_REG=10
 
 NUM_GPUS=8
 MASTER_PORT=18900             
@@ -69,6 +70,7 @@ torchrun \
     metanetwork.edge_res_ratio=$EDGE_RES_RATIO \
     meta_train.lr=$METATRAIN_LR \
     meta_train.lr_decay_milestones=$METATRAIN_LR_DECAY_MILESTONES \
+    meta_train.pruner_reg=$PRUNER_REG \
     data_model_num=$DATA_MODEL_NUM \
     model=$MODEL \
     run=$RUN_TYPE \

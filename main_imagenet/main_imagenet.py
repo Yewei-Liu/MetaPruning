@@ -146,13 +146,13 @@ def meta_train_one_epoch(
                 # print(f"Max gradient: {max_grad.item()}")
                 # optimizer.step()
 
-
-                # Compute the total gradient norm BEFORE clipping
-                total_norm_before = torch.norm(
-                    torch.stack([torch.norm(p.grad.detach(), 2) for p in metanetwork.parameters() if p.grad is not None]), 
-                    2
-                )
                 if cfg_meta_train.clip_grad_norm != 0:
+                    # Compute the total gradient norm BEFORE clipping
+                    total_norm_before = torch.norm(
+                        torch.stack([torch.norm(p.grad.detach(), 2) for p in metanetwork.parameters() if p.grad is not None]), 
+                        2
+                    )
+                    
                     # Clip gradients
                     nn.utils.clip_grad_norm_(metanetwork.parameters(), cfg_meta_train.clip_grad_norm)
                     
