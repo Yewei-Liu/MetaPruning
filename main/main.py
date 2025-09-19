@@ -68,13 +68,15 @@ def main(cfg):
     cfg = cfg.task
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_train_loader = None
+    model_train_loader, model_val_loader = get_dataset_model_loader(cfg.dataset_model)
     try:
         model_train_loader, model_val_loader = get_dataset_model_loader(cfg.dataset_model)
     except:
         print('No dataset models exist, just for quick reproduce.')
     big_train_loader, big_test_loader = get_dataset_loader(cfg.big_batch_dataset)
     small_train_loader, small_test_loader = get_dataset_loader(cfg.small_batch_dataset)
-
+    
     if run == 'meta_train':
         metanetwork = hydra.utils.instantiate(cfg.metanetwork).to(device)
         if model_train_loader is None:

@@ -34,7 +34,7 @@ dataset_model:
 meta_train:
   epochs: 100
   lr : 0.001 
-  lr_decay_milestones : "15"
+  lr_decay_milestones : "10"
   lr_decay_gamma : 0.1
   weight_decay : 5e-4
   method : ${method}
@@ -64,8 +64,8 @@ metanetwork:
   hiddim: 32
   in_node_dim: 5
   in_edge_dim: 9
-  node_res_ratio: 0.02
-  edge_res_ratio: 0.02
+  node_res_ratio: 0.05
+  edge_res_ratio: 0.05
     
 
 visualize:
