@@ -69,7 +69,6 @@ def main(cfg):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_train_loader = None
-    model_train_loader, model_val_loader = get_dataset_model_loader(cfg.dataset_model)
     try:
         model_train_loader, model_val_loader = get_dataset_model_loader(cfg.dataset_model)
     except:
