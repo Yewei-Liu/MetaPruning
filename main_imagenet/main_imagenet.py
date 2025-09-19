@@ -374,10 +374,24 @@ def train(
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
         # lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
-        milestones = [int(ms) for ms in cfg.lr_decay_milestones.split(",")]
-        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-            optimizer, milestones=milestones, gamma=cfg.lr_gamma
-        )
+        cfg.lr_scheduler = cfg.lr_scheduler.lower()
+        if cfg.lr_scheduler == "steplr":
+            milestones = [int(ms) for ms in cfg.lr_decay_milestones.split(",")]
+            lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                optimizer, milestones=milestones, gamma=cfg.lr_gamma
+            )
+        elif cfg.lr_scheduler == "cosineannealinglr":
+            lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=epochs - lr_warmup_epochs, eta_min=cfg.lr_min
+            )
+        elif cfg.lr_scheduler == "exponentiallr":
+            lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=cfg.lr_gamma)
+        else:
+            raise RuntimeError(
+                f"Invalid lr scheduler '{cfg.lr_scheduler}'. Only StepLR, CosineAnnealingLR and ExponentialLR "
+                "are supported."
+            )
+
         cfg.start_epoch = checkpoint["epoch"] + 1
         for i in range(cfg.start_epoch):
             lr_scheduler.step()

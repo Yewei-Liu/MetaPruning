@@ -20,7 +20,7 @@ INDEX=1
 METANETWORK_INDEX=5
 RUN_TYPE="visualize"                
 NAME=Final_ViT
-RESUME_EPOCH=-1
+RESUME_EPOCH=0
 LR=0.001
 WEIGHT_DECAY=0.05
 EPOCHS=100
@@ -28,7 +28,7 @@ BATCH_SIZE=128
 OPT="adamw"     
 LR_SCHEDULER="cosineannealinglr"      
 
-NUM_GPUS=8         
+NUM_GPUS=8
 MASTER_PORT=18900             
 CONFIG_NAME="base"              
         
@@ -65,7 +65,7 @@ torchrun \
     lr=$LR \
     weight_decay=$WEIGHT_DECAY \
     lr_scheduler=$LR_SCHEDULER \
-    optimizer=$OPT \
+    opt=$OPT \
     epochs=$EPOCHS \
     +metanetwork_index=$METANETWORK_INDEX \
     > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${INDEX}.log" 2>&1
