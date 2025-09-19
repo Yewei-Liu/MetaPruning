@@ -1,10 +1,10 @@
 #!/bin/bash
 
 #SBATCH -J metapruning
-#SBATCH -p IAI_SLURM_HGX
-#SBATCH --qos=16gpu-hgx
+#SBATCH -p IAI_SLURM_3090
+#SBATCH --qos=8gpu
 #SBATCH -N 1
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:8
 #SBATCH --time=48:00:00
 #SBATCH -c 64
 #SBATCH -o meta_train.out
@@ -20,12 +20,12 @@ INDEX=2
 METANETWORK_INDEX=10
 RUN_TYPE="visualize"                
 NAME=Large
-RESUME_EPOCH=-1
+RESUME_EPOCH=0
 LR=0.01
 EPOCHS=200
 LR_DECAY_MILESTONES=\'120,160,185\'
 
-NUM_GPUS=4                     
+NUM_GPUS=8                     
 MASTER_PORT=18900             
 CONFIG_NAME="base"              
         

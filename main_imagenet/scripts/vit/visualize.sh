@@ -1,10 +1,10 @@
 #!/bin/bash
 
 #SBATCH -J metapruning
-#SBATCH -p IAI_SLURM_HGX
-#SBATCH --qos=16gpu-hgx
+#SBATCH -p IAI_SLURM_3090
+#SBATCH --qos=8gpu
 #SBATCH -N 1
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:8
 #SBATCH --time=48:00:00
 #SBATCH -c 64
 #SBATCH -o visualize.out
@@ -16,16 +16,19 @@
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.device_count())"
 
 MODEL="vit_b_16"  
-INDEX=1
-METANETWORK_INDEX=3
+INDEX=1 
+METANETWORK_INDEX=5
 RUN_TYPE="visualize"                
 NAME=Final_ViT
 RESUME_EPOCH=-1
-LR=0.01
-EPOCHS=0
-LR_DECAY_MILESTONES=\'120,160,185\'
+LR=0.001
+WEIGHT_DECAY=0.05
+EPOCHS=100
+BATCH_SIZE=128 
+OPT="adamw"     
+LR_SCHEDULER="cosineannealinglr"      
 
-NUM_GPUS=4                
+NUM_GPUS=8         
 MASTER_PORT=18900             
 CONFIG_NAME="base"              
         
@@ -53,15 +56,16 @@ torchrun \
     --master_port=$MASTER_PORT \
     main_imagenet.py \
     +experiment=$CONFIG_NAME \
-    batch_size=32 \
-    big_batch_size=32 \
+    batch_size=$BATCH_SIZE \
     model=$MODEL \
     run=$RUN_TYPE \
     index=$INDEX \
     name=$NAME \
     resume_epoch=$RESUME_EPOCH \
     lr=$LR \
-    lr_decay_milestones=$LR_DECAY_MILESTONES \
+    weight_decay=$WEIGHT_DECAY \
+    lr_scheduler=$LR_SCHEDULER \
+    optimizer=$OPT \
     epochs=$EPOCHS \
     +metanetwork_index=$METANETWORK_INDEX \
     > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${INDEX}.log" 2>&1
