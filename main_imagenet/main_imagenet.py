@@ -798,7 +798,7 @@ def main(cfg: DictConfig) -> None:
 
         print(f"Origin speed up : {base_ops / pruned_ops}")
         cfg.output_dir = savedir
-        model = train(model, cfg.epochs, cfg.lr, 0, train_sampler, data_loader, data_loader_test, device, cfg, pruner=None, state_dict_only=True, save_every_epoch=True)
+        model = train(model, cfg.epochs, cfg.lr, cfg.lr_warmup_epochs, train_sampler, data_loader, data_loader_test, device, cfg, pruner=None, state_dict_only=True, save_every_epoch=True)
         
         model_list = [model, origin_model]
         label_list = ['after metanetwork', 'origin']
@@ -832,7 +832,7 @@ def main(cfg: DictConfig) -> None:
 
         cfg.lr_decay_milestones = "120,160,185"
         cfg.output_dir = savedir
-        model = train(model, 200, 0.01, 0, train_sampler, data_loader, data_loader_test, device, cfg, pruner=None, state_dict_only=True, save_every_epoch=True)
+        model = train(model, 200, 0.01, cfg.lr_warmup_epochs, train_sampler, data_loader, data_loader_test, device, cfg, pruner=None, state_dict_only=True, save_every_epoch=True)
 
 
     elif cfg.run == 'train_from_scratch':
