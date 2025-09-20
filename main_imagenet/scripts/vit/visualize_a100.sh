@@ -4,7 +4,7 @@
 #SBATCH -p IAI_SLURM_HGX
 #SBATCH --qos=16gpu-hgx
 #SBATCH -N 1
-#SBATCH --gres=gpu:8
+#SBATCH --gres=gpu:4
 #SBATCH --time=48:00:00
 #SBATCH -c 64
 #SBATCH -o visualize.out
@@ -17,18 +17,21 @@
 
 MODEL="vit_b_16"  
 INDEX=1 
-METANETWORK_INDEX=5
+METANETWORK_INDEX=8
 RUN_TYPE="visualize"                
-NAME=Final_ViT
+NAME=ViT_visualize
 RESUME_EPOCH=-1
-LR=0.001
-WEIGHT_DECAY=0.05
-EPOCHS=100
-BATCH_SIZE=128 
+LR=0.002
+WEIGHT_DECAY=0.3
+EPOCHS=200
+BATCH_SIZE=256
 OPT="adamw"     
-LR_SCHEDULER="cosineannealinglr"      
+LR_SCHEDULER="cosineannealinglr"  
+LR_WARMUP_METHOD="linear"
+LR_WARMUP_EPOCHS=20
+LR_WARMUP_DECAY=0.05
 
-NUM_GPUS=8
+NUM_GPUS=4
 MASTER_PORT=18900             
 CONFIG_NAME="base"              
         
@@ -66,6 +69,9 @@ torchrun \
     weight_decay=$WEIGHT_DECAY \
     lr_scheduler=$LR_SCHEDULER \
     opt=$OPT \
+    lr_warmup_method=$LR_WARMUP_METHOD \
+    lr_warmup_epochs=$LR_WARMUP_EPOCHS \
+    lr_warmup_decay=$LR_WARMUP_DECAY \
     epochs=$EPOCHS \
     +metanetwork_index=$METANETWORK_INDEX \
     > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${INDEX}.log" 2>&1

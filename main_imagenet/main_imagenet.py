@@ -377,20 +377,39 @@ def train(
         cfg.lr_scheduler = cfg.lr_scheduler.lower()
         if cfg.lr_scheduler == "steplr":
             milestones = [int(ms) for ms in cfg.lr_decay_milestones.split(",")]
-            lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+            main_lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 optimizer, milestones=milestones, gamma=cfg.lr_gamma
             )
         elif cfg.lr_scheduler == "cosineannealinglr":
-            lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            main_lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 optimizer, T_max=epochs - lr_warmup_epochs, eta_min=cfg.lr_min
             )
         elif cfg.lr_scheduler == "exponentiallr":
-            lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=cfg.lr_gamma)
+            main_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=cfg.lr_gamma)
         else:
             raise RuntimeError(
                 f"Invalid lr scheduler '{cfg.lr_scheduler}'. Only StepLR, CosineAnnealingLR and ExponentialLR "
                 "are supported."
             )
+
+        if lr_warmup_epochs > 0:
+            if cfg.lr_warmup_method == "linear":
+                warmup_lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+                    optimizer, start_factor=cfg.lr_warmup_decay, total_iters=lr_warmup_epochs
+                )
+            elif cfg.lr_warmup_method == "constant":
+                warmup_lr_scheduler = torch.optim.lr_scheduler.ConstantLR(
+                    optimizer, factor=cfg.lr_warmup_decay, total_iters=lr_warmup_epochs
+                )
+            else:
+                raise RuntimeError(
+                    f"Invalid warmup lr method '{cfg.lr_warmup_method}'. Only linear and constant are supported."
+                )
+            lr_scheduler = torch.optim.lr_scheduler.SequentialLR(
+                optimizer, schedulers=[warmup_lr_scheduler, main_lr_scheduler], milestones=[lr_warmup_epochs]
+            )
+        else:
+            lr_scheduler = main_lr_scheduler
 
         cfg.start_epoch = checkpoint["epoch"] + 1
         for i in range(cfg.start_epoch):

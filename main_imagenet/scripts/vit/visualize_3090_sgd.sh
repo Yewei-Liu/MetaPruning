@@ -17,19 +17,16 @@
 
 MODEL="vit_b_16"  
 INDEX=1 
-METANETWORK_INDEX=8
+METANETWORK_INDEX=2
 RUN_TYPE="visualize"                
-NAME=ViT_visualize
+NAME="Final_ViT_1"
 RESUME_EPOCH=0
-LR=0.002
-WEIGHT_DECAY=0.3
+LR=0.01
+WEIGHT_DECAY=0.05
 EPOCHS=200
 BATCH_SIZE=128 
-OPT="adamw"     
-LR_SCHEDULER="cosineannealinglr"  
-LR_WARMUP_METHOD="linear"
-LR_WARMUP_EPOCHS=20
-LR_WARMUP_DECAY=0.05
+OPT="sgd"     
+LR_DECAY_MILESTONES=\'120,160,185\'   
 
 NUM_GPUS=8
 MASTER_PORT=18900             
@@ -67,11 +64,8 @@ torchrun \
     resume_epoch=$RESUME_EPOCH \
     lr=$LR \
     weight_decay=$WEIGHT_DECAY \
-    lr_scheduler=$LR_SCHEDULER \
+    lr_decay_milestones=$LR_DECAY_MILESTONES \
     opt=$OPT \
-    lr_warmup_method=$LR_WARMUP_METHOD \
-    lr_warmup_epochs=$LR_WARMUP_EPOCHS \
-    lr_warmup_decay=$LR_WARMUP_DECAY \
     epochs=$EPOCHS \
     +metanetwork_index=$METANETWORK_INDEX \
     > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${INDEX}.log" 2>&1
