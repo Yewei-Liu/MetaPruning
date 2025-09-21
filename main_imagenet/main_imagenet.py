@@ -459,7 +459,7 @@ def meta_train(
     device, cfg_meta_train, cfg):
 
 
-    if cfg_meta_train.label_smoothing>0:
+    if cfg_meta_train.label_smoothing > 0:
         criterion = nn.CrossEntropyLoss(label_smoothing=cfg_meta_train.label_smoothing)
     else:
         criterion = nn.CrossEntropyLoss()
@@ -594,10 +594,7 @@ def visualize_acc_speed_up_curve(
         model.to(device)
         if cfg.distributed and cfg.sync_bn:
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-        if cfg.label_smoothing>0:
-            criterion = nn.CrossEntropyLoss(label_smoothing=cfg.label_smoothing)
-        else:
-            criterion = nn.CrossEntropyLoss()
+        criterion = nn.CrossEntropyLoss()
         model_without_ddp = model
         if cfg.distributed:
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.gpu])
@@ -804,7 +801,7 @@ def main(cfg: DictConfig) -> None:
         label_list = ['after metanetwork', 'origin']
         speed_up_list = [base_ops / pruned_ops, base_ops / pruned_ops]
         visualize_acc_speed_up_curve(model_list, label_list, data_loader_test, speed_up_list, cfg, max_speed_up=2.5,
-                                     save_dir=savedir, name=f'visualize.png', ylim=(0.6, 1.0))   
+                                     save_dir=savedir, name=f'visualize.png', ylim=(0.0, 1.0))   
             
 
     elif cfg.run == 'prune_after_metanetwork':
@@ -864,10 +861,7 @@ def main(cfg: DictConfig) -> None:
         if cfg.distributed and cfg.sync_bn:
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
-        if cfg.label_smoothing>0:
-            criterion = nn.CrossEntropyLoss(label_smoothing=cfg.label_smoothing)
-        else:
-            criterion = nn.CrossEntropyLoss()
+        criterion = nn.CrossEntropyLoss()
 
         # scaler = torch.cuda.amp.GradScaler() if args.amp else None
         scaler = torch.amp.GradScaler('cuda') if cfg.amp else None

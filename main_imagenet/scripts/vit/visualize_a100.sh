@@ -4,7 +4,7 @@
 #SBATCH -p IAI_SLURM_HGX
 #SBATCH --qos=16gpu-hgx
 #SBATCH -N 1
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:8
 #SBATCH --time=48:00:00
 #SBATCH -c 64
 #SBATCH -o visualize.out
@@ -19,19 +19,19 @@ MODEL="vit_b_16"
 INDEX=1 
 METANETWORK_INDEX=8
 RUN_TYPE="visualize"                
-NAME=ViT_visualize
+NAME=ViT_visualize_3
 RESUME_EPOCH=-1
-LR=0.002
-WEIGHT_DECAY=0.3
-EPOCHS=200
-BATCH_SIZE=256
+LR=0.0001
+WEIGHT_DECAY=0.05
+EPOCHS=100
+BATCH_SIZE=128
 OPT="adamw"     
 LR_SCHEDULER="cosineannealinglr"  
 LR_WARMUP_METHOD="linear"
-LR_WARMUP_EPOCHS=20
-LR_WARMUP_DECAY=0.05
+LR_WARMUP_EPOCHS=10
+LR_WARMUP_DECAY=0.1
 
-NUM_GPUS=4
+NUM_GPUS=8
 MASTER_PORT=18900             
 CONFIG_NAME="base"              
         

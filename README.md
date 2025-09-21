@@ -19,7 +19,9 @@ We have referenced the [Depgraph](https://github.com/VainF/Torch-Pruning) and [N
 ## 🚀 Getting Started
 
 - git clone or download our code
-- create the conda env
+- create the conda env using (1) or (2)
+
+(1) resnet56 on CIFAR10, VGG19 on CIFAR100
 ```bash
 conda create -n MetaPruning python=3.9 -y
 conda activate MetaPruning
@@ -34,7 +36,22 @@ pip install termcolor
 pip install h5py
 ```
 
-- install our package
+(2) resnet50 on IMAGENET, ViT on IMAGENET
+```bash
+conda create -n MetaPruning python=3.9 -y
+conda activate MetaPruning
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu118
+pip install torch_geometric
+pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.4.0+cu118.html
+pip install hydra-core einops opencv-python 
+pip install torch-pruning 
+pip install datasets 
+pip install importlib_metadata
+pip install termcolor
+pip install h5py
+```
+
+- After finishing (1) or (2), install our package
 ```bash
 cd MetaPruning
 pip install -e .
