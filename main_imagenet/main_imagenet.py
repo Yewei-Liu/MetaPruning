@@ -410,8 +410,10 @@ def train(
             )
         else:
             lr_scheduler = main_lr_scheduler
-
-        cfg.start_epoch = checkpoint["epoch"] + 1
+        if cfg.force_start_epoch == -1:
+            cfg.start_epoch = checkpoint["epoch"] + 1
+        else:
+            cfg.start_epoch = cfg.force_start_epoch
         for i in range(cfg.start_epoch):
             lr_scheduler.step()
         if scaler:

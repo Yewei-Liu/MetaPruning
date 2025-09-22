@@ -68,6 +68,7 @@ output_dir: "save/${name}/${index}/${run}"
 resume: ""
 resume_epoch: -1
 start_epoch: 0
+force_start_epoch: -1
 cache_dataset: True
 sync_bn: False
 auto_augment: null

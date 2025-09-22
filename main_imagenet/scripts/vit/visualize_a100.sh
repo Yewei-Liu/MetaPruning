@@ -9,6 +9,7 @@
 #SBATCH -c 64
 #SBATCH -o visualize.out
 #SBATCH -e visualize.err
+#SBATCH --nodelist=hgx001
 
 
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.__version__)"
@@ -19,17 +20,21 @@ MODEL="vit_b_16"
 INDEX=1 
 METANETWORK_INDEX=8
 RUN_TYPE="visualize"                
-NAME=ViT_visualize_3
-RESUME_EPOCH=-1
+NAME=ViT_visualize_7
+RESUME_EPOCH=0
 LR=0.0001
-WEIGHT_DECAY=0.05
-EPOCHS=100
+WEIGHT_DECAY=0.01
+EPOCHS=60
 BATCH_SIZE=128
 OPT="adamw"     
 LR_SCHEDULER="cosineannealinglr"  
 LR_WARMUP_METHOD="linear"
 LR_WARMUP_EPOCHS=10
 LR_WARMUP_DECAY=0.1
+LABEL_SMOOTHING=0.1
+MIXUP_ALPHA=0.2
+CUTMIX_ALPHA=0.1
+FORCE_START_EPOCH=0
 
 NUM_GPUS=8
 MASTER_PORT=18900             
@@ -72,6 +77,10 @@ torchrun \
     lr_warmup_method=$LR_WARMUP_METHOD \
     lr_warmup_epochs=$LR_WARMUP_EPOCHS \
     lr_warmup_decay=$LR_WARMUP_DECAY \
+    label_smoothing=$LABEL_SMOOTHING \
+    mixup_alpha=$MIXUP_ALPHA \
+    cutmix_alpha=$CUTMIX_ALPHA \
+    force_start_epoch=$FORCE_START_EPOCH \
     epochs=$EPOCHS \
     +metanetwork_index=$METANETWORK_INDEX \
     > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${INDEX}.log" 2>&1
