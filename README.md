@@ -15,6 +15,14 @@ This repository contains the codes for our paper. You can reproduce our work or 
 
 We have referenced the [Depgraph](https://github.com/VainF/Torch-Pruning) and [NGGNN](https://github.com/mkofinas/neural-graphs) codebases in part for our implementation. Thanks 😊.
 
+Conversion Between Network and Graph:
+
+![Conversion](figures/conversion.png)
+
+Meta-Training Pipeline:
+
+![Meta-TrainingPipeline](figures/meta-training%20pipeline.png)
+
 ---
 
 ## 🚀 Getting Started
