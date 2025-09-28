@@ -17,19 +17,19 @@
 
 MODEL="vit_b_16"  
 INDEX=1 
-METANETWORK_INDEX=4
+METANETWORK_INDEX=8
 RUN_TYPE="visualize"                
-NAME=Final_ViT_2
+NAME=ViT
 RESUME_EPOCH=44
 LR=0.0001
 WEIGHT_DECAY=0.01
-EPOCHS=45
+EPOCHS=300
 BATCH_SIZE=128
 OPT="adamw"     
 LR_SCHEDULER="cosineannealinglr"  
 LR_WARMUP_METHOD="linear"
-LR_WARMUP_EPOCHS=10
-LR_WARMUP_DECAY=0.1
+LR_WARMUP_EPOCHS=30
+LR_WARMUP_DECAY=0.01
 LABEL_SMOOTHING=0.1
 MIXUP_ALPHA=0.2
 CUTMIX_ALPHA=0.1
@@ -79,7 +79,7 @@ torchrun \
     label_smoothing=$LABEL_SMOOTHING \
     mixup_alpha=$MIXUP_ALPHA \
     cutmix_alpha=$CUTMIX_ALPHA \
-    epochs=$EPOCHS \
     force_start_epoch=$FORCE_START_EPOCH \
+    epochs=$EPOCHS \
     +metanetwork_index=$METANETWORK_INDEX \
     > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${INDEX}.log" 2>&1

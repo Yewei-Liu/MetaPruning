@@ -1,6 +1,6 @@
 ## 🔍 Overview
 
-This directory includes codes for generating data models.
+This directory includes codes for generating data models. Each data model is trained from scratch, initial pruned, finetuned, and saved with their relative infomation.
 
 ---
 

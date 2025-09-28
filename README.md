@@ -1,6 +1,7 @@
-# 📄 Meta Pruning via Graph Metanetworks : A Meta Learning Framework for Network Pruning
+# 📄 Meta Pruning via Graph Metanetworks : A Universal Meta Learning Framework for Network Pruning
 
-![Meta Training pipeline](figures/meta_training_pipeline.png)
+![For a pruning criterion, we use a metanetwork to change a hard to prune network into another easy to prune network for better pruning.](figures/intro.png)
+
 
 **[Basic info]**  
 *Authors: [Yewei Liu], [Xiyuan Wang], [Muhan Zhang]*  
@@ -10,7 +11,7 @@
 
 ## 🔍 Overview
 
-This repository contains the codes for our paper. We implemented the 3 experimenets in our paper (pruning ResNet56 on CIFAR10, VGG10 on CIFAR100, ResNet50 on ImageNet). You can also easily add other experiments based on our framework.
+This repository contains the codes for our paper. You can reproduce our work or easily add other experiments based on our framework.
 
 We have referenced the [Depgraph](https://github.com/VainF/Torch-Pruning) and [NGGNN](https://github.com/mkofinas/neural-graphs) codebases in part for our implementation. Thanks 😊.
 
@@ -21,7 +22,7 @@ We have referenced the [Depgraph](https://github.com/VainF/Torch-Pruning) and [N
 - git clone or download our code
 - create the conda env using (1) or (2)
 
-(1) resnet56 on CIFAR10, VGG19 on CIFAR100
+(1) main (change the cuda version as you need)
 ```bash
 conda create -n MetaPruning python=3.9 -y
 conda activate MetaPruning
@@ -36,7 +37,7 @@ pip install termcolor
 pip install h5py
 ```
 
-(2) resnet50 on IMAGENET, ViT on IMAGENET
+(2) main_imagenet (change the cuda version as you need)
 ```bash
 conda create -n MetaPruning python=3.9 -y
 conda activate MetaPruning
@@ -86,9 +87,9 @@ pip install -e .
 
 ## 🧪 Usage
 
-See ['main/README.md'](main/README.md) for our implementation on small datasets without parallel (ResNet56 on CIFAR10, VGG19 on CIFAR100)
+See ['main/README.md'](main/README.md) for our implementation on small datasets without parallel (ResNet56 on CIFAR10, VGG19 on CIFAR100, etc.)
 
-See ['main_imagenet/README.md'](main_imagenet/README.md) for our implementation on big datasets with data parallel (ResNet50 on ImageNet)
+See ['main_imagenet/README.md'](main_imagenet/README.md) for our implementation on big datasets with data parallel (ResNet50 on ImageNet, ViT on ImageNet)
 
 
 ---

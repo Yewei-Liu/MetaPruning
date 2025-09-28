@@ -9,7 +9,6 @@
 #SBATCH -c 64
 #SBATCH -o visualize.out
 #SBATCH -e visualize.err
-#SBATCH --nodelist=hgx001
 
 
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.__version__)"
@@ -18,19 +17,19 @@
 
 MODEL="vit_b_16"  
 INDEX=1 
-METANETWORK_INDEX=4
+METANETWORK_INDEX=24
 RUN_TYPE="visualize"                
-NAME=Final_ViT_1
-RESUME_EPOCH=6
+NAME=ViT
+RESUME_EPOCH=-1
 LR=0.0001
 WEIGHT_DECAY=0.01
-EPOCHS=100
+EPOCHS=300
 BATCH_SIZE=128
 OPT="adamw"     
 LR_SCHEDULER="cosineannealinglr"  
 LR_WARMUP_METHOD="linear"
-LR_WARMUP_EPOCHS=10
-LR_WARMUP_DECAY=0.1
+LR_WARMUP_EPOCHS=30
+LR_WARMUP_DECAY=0.01
 LABEL_SMOOTHING=0.1
 MIXUP_ALPHA=0.2
 CUTMIX_ALPHA=0.1

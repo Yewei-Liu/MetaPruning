@@ -9,7 +9,6 @@
 #SBATCH -c 64
 #SBATCH -o meta_train.out
 #SBATCH -e meta_train.err
-#SBATCH --nodelist=hgx001
 
 
 ~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.__version__)"
@@ -19,19 +18,19 @@
 MODEL="vit_b_16"  
 DATA_MODEL_NUM=1
 RUN_TYPE="meta_train"     
-NAME="Final_ViT_1"
-RESUME_EPOCH=5
+NAME="ViT"
+RESUME_EPOCH=13
 # metanetwork
 TARGET=nn.GNN.MyGNN_ViT
 NUM_LAYER=3
 HIDDIM=4
 IN_NODE_DIM=6
-NODE_RES_RATIO=0.1
-EDGE_RES_RATIO=0.1
+NODE_RES_RATIO=0.05
+EDGE_RES_RATIO=0.05
 # meta train
-METATRAIN_LR=0.01
+METATRAIN_LR=0.001
 METATRAIN_LR_DECAY_MILESTONES=\'300000\'
-PRUNER_REG=1000
+PRUNER_REG=10
 
 NUM_GPUS=8
 MASTER_PORT=18900             
