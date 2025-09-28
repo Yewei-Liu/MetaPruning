@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH -J metapruning
-#SBATCH -p IAI_SLURM_3090
-#SBATCH --qos=8gpu
+#SBATCH -p IAI_SLURM_HGX
+#SBATCH --qos=16gpu-hgx
 #SBATCH -N 1
 #SBATCH --gres=gpu:8
 #SBATCH --time=48:00:00
@@ -17,10 +17,10 @@
 
 MODEL="resnet50"  
 INDEX=2
-METANETWORK_INDEX=10
+METANETWORK_INDEX=12
 RUN_TYPE="visualize"                
-NAME=Large
-RESUME_EPOCH=0
+NAME=FinalResnet
+RESUME_EPOCH=-1
 LR=0.01
 EPOCHS=200
 LR_DECAY_MILESTONES=\'120,160,185\'

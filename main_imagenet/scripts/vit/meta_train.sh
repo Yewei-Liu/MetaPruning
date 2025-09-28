@@ -19,7 +19,7 @@ MODEL="vit_b_16"
 DATA_MODEL_NUM=1
 RUN_TYPE="meta_train"     
 NAME="ViT"
-RESUME_EPOCH=13
+RESUME_EPOCH=-1
 # metanetwork
 TARGET=nn.GNN.MyGNN_ViT
 NUM_LAYER=3

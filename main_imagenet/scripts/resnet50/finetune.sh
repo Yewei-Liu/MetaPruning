@@ -13,7 +13,7 @@
 MODEL="resnet50"            
 INDEX=0
 RUN_TYPE="finetune"                 
-NAME=Final
+NAME=FinalResnet
 EPOCHS=60
 LR=0.01
 LR_DECAY_MILESTOMES=\'30\'

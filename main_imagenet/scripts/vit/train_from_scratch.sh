@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J metapruning
-#SBATCH -p IAI_SLURM_3090
-#SBATCH --qos=8gpu
+#SBATCH -p IAI_SLURM_HGX
+#SBATCH --qos=16gpu-hgx
 #SBATCH -N 1
 #SBATCH --gres=gpu:8
 #SBATCH --time=48:00:00
@@ -15,7 +15,7 @@ nvidia-smi
 MODEL="vit_b_16"  
 INDEX=1
 RUN_TYPE="train_from_scratch"                 
-NAME="Final_ViT"
+NAME=FinalViT
 PRETRAINED=True
 EPOCHS=1
 LR=0.0

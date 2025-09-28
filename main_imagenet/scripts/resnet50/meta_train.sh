@@ -18,8 +18,8 @@
 MODEL="resnet50"  
 DATA_MODEL_NUM=2
 RUN_TYPE="meta_train"     
-NAME="Large"
-RESUME_EPOCH=1
+NAME=FinalResnet
+RESUME_EPOCH=-1
 # metanetwork
 NUM_LAYER=6
 HIDDIM=16

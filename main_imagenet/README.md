@@ -46,9 +46,9 @@ sbatch scripts/resnet50/visualize.sh
 
 Hyperparameters of `visualize.sh` is as follows
 - `INDEX=2` : Use data model with index 2.
-- `METANETWORK_INDEX=13` : Use metanetwork from epoch 13 in meta-training.
+- `METANETWORK_INDEX=12` : Use metanetwork from epoch 12 in meta-training.
 - `RUN_TYPE="visualize"` : Set running type to visualize.               
-- `NAME=Final ` : A name for read data models and output.
+- `NAME=FinalResnet ` : A name for read data models and output.
 - `RESUME_EPOCH=-1` : Resume from a previously saved checkpoint. For example, if finetuning completed epoch 5 before the process was interrupted, you can set this value to 5 to continue training at epoch 6. By default, this is set to -1, which means training will start from the beginning.
 
 Then we continue to prune and finetune this network by running:
@@ -58,9 +58,9 @@ sbatch scripts/resnet50/prune_after_metanetwork.sh
 
 Hyperparameters of `prune_after_metanetwork.sh` is as follows
 - `INDEX=2` : Use data model with index 2.
-- `METANETWORK_INDEX=13` : Use metanetwork from epoch 13 in meta-training.
+- `METANETWORK_INDEX=12` : Use metanetwork from epoch 12 in meta-training.
 - `RUN_TYPE="prune_after_metanetwork"` : Set running type to prune after metanetwork.               
-- `NAME=Final ` : A name for read data models and output.
+- `NAME=FinalResnet` : A name for read data models and output.
 - `SPEED_UP=2.3095` : The final target speed up, pruning to a speed up a little bit larger than this.
 - `RESUME_EPOCH=-1` : Resume from a previously saved checkpoint. For example, if finetuning completed epoch 5 before the process was interrupted, you can set this value to 5 to continue training at epoch 6. By default, this is set to -1, which means training will start from the beginning.
 

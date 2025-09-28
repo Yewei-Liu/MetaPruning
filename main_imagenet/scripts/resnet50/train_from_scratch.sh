@@ -4,7 +4,7 @@
 #SBATCH -p IAI_SLURM_HGX
 #SBATCH --qos=16gpu-hgx
 #SBATCH -N 1
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:8
 #SBATCH --time=48:00:00
 #SBATCH -c 64
 #SBATCH -o tmp.out
@@ -21,13 +21,13 @@ nvidia-smi
 MODEL="resnet50"  
 INDEX=0
 RUN_TYPE="train_from_scratch"                 
-NAME=ViTDataModel
+NAME=FinalResnet
 PRETRAINED=True
 EPOCHS=30
 LR=0.01
 LR_DECAY_MILESTOMES=\'10\'
 
-NUM_GPUS=4                   
+NUM_GPUS=8                   
 MASTER_PORT=18900             
 CONFIG_NAME="base"              
         
