@@ -829,9 +829,8 @@ def main(cfg: DictConfig) -> None:
             model = state_dict_to_model(model_name, ckpt['model'], device)
             cfg.resume = os.path.join('save', f'{cfg.name}', 'prune_after_metanetwork', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}', f'{cfg.speed_up}', f'epoch_{cfg.resume_epoch}.pth')
 
-        cfg.lr_decay_milestones = "120,160,185"
         cfg.output_dir = savedir
-        model = train(model, 200, 0.01, cfg.lr_warmup_epochs, train_sampler, data_loader, data_loader_test, device, cfg, pruner=None, state_dict_only=True, save_every_epoch=True)
+        model = train(model, cfg.epochs, cfg.lr, cfg.lr_warmup_epochs, train_sampler, data_loader, data_loader_test, device, cfg, pruner=None, state_dict_only=True, save_every_epoch=True)
 
 
     elif cfg.run == 'train_from_scratch':
