@@ -825,9 +825,9 @@ def main(cfg: DictConfig) -> None:
             current_speed_up *= speed_up
             print(f"Current speed up : {current_speed_up}")
         else:
-            ckpt = torch.load(os.path.join('save', f'{cfg.name}', 'prune_after_metanetwork', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}', f'{cfg.speed_up}', f'epoch_{cfg.resume_epoch}.pth'), weights_only=False, map_location=device)
+            ckpt = torch.load(os.path.join('save', f'{cfg.name}', 'prune_after_metanetwork', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}', f'{cfg.speed_up:.4f}', f'epoch_{cfg.resume_epoch}.pth'), weights_only=False, map_location=device)
             model = state_dict_to_model(model_name, ckpt['model'], device)
-            cfg.resume = os.path.join('save', f'{cfg.name}', 'prune_after_metanetwork', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}', f'{cfg.speed_up}', f'epoch_{cfg.resume_epoch}.pth')
+            cfg.resume = os.path.join('save', f'{cfg.name}', 'prune_after_metanetwork', f'{cfg.index}', f'metanetwork_{cfg.metanetwork_index}', f'{cfg.speed_up:.4f}', f'epoch_{cfg.resume_epoch}.pth')
 
         cfg.output_dir = savedir
         model = train(model, cfg.epochs, cfg.lr, cfg.lr_warmup_epochs, train_sampler, data_loader, data_loader_test, device, cfg, pruner=None, state_dict_only=True, save_every_epoch=True)
