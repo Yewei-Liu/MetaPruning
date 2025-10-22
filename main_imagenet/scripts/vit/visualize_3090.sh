@@ -10,19 +10,16 @@
 #SBATCH -o visualize.out
 #SBATCH -e visualize.err
 
-
-~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.__version__)"
-~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.is_available())"
-~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.device_count())"
-
 MODEL="vit_b_16"  
 INDEX=1 
-METANETWORK_INDEX=8
+METANETWORK_INDEX=22
 RUN_TYPE="visualize"                
-NAME=FinalViT
-RESUME_EPOCH=-1
-LR=0.0001
-WEIGHT_DECAY=0.01
+NAME=ViT
+RESUME_EPOCH=0
+LR=0.0004
+LR_MIN=0.000001
+CLIP_GRAD_NORM=1.0
+WEIGHT_DECAY=0.05
 EPOCHS=300
 BATCH_SIZE=128
 OPT="adamw"     
@@ -70,6 +67,8 @@ torchrun \
     name=$NAME \
     resume_epoch=$RESUME_EPOCH \
     lr=$LR \
+    lr_min=$LR_MIN \
+    clip_grad_norm=$CLIP_GRAD_NORM \
     weight_decay=$WEIGHT_DECAY \
     lr_scheduler=$LR_SCHEDULER \
     opt=$OPT \

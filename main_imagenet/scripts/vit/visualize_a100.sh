@@ -4,7 +4,7 @@
 #SBATCH -p IAI_SLURM_HGX
 #SBATCH --qos=16gpu-hgx
 #SBATCH -N 1
-#SBATCH --gres=gpu:8
+#SBATCH --gres=gpu:4
 #SBATCH --time=48:00:00
 #SBATCH -c 64
 #SBATCH -o visualize.out
@@ -17,14 +17,16 @@
 
 MODEL="vit_b_16"  
 INDEX=1 
-METANETWORK_INDEX=24
+METANETWORK_INDEX=22
 RUN_TYPE="visualize"                
 NAME=ViT
 RESUME_EPOCH=-1
 LR=0.0001
+LR_MIN=0.000001
+CLIP_GRAD_NORM=1.0
 WEIGHT_DECAY=0.01
 EPOCHS=300
-BATCH_SIZE=128
+BATCH_SIZE=256
 OPT="adamw"     
 LR_SCHEDULER="cosineannealinglr"  
 LR_WARMUP_METHOD="linear"
@@ -35,7 +37,7 @@ MIXUP_ALPHA=0.2
 CUTMIX_ALPHA=0.1
 FORCE_START_EPOCH=-1
 
-NUM_GPUS=8
+NUM_GPUS=4
 MASTER_PORT=18900             
 CONFIG_NAME="base"              
         
@@ -70,6 +72,8 @@ torchrun \
     name=$NAME \
     resume_epoch=$RESUME_EPOCH \
     lr=$LR \
+    lr_min=$LR_MIN \
+    clip_grad_norm=$CLIP_GRAD_NORM \
     weight_decay=$WEIGHT_DECAY \
     lr_scheduler=$LR_SCHEDULER \
     opt=$OPT \

@@ -372,7 +372,11 @@ def train(
         model_without_ddp.load_state_dict(checkpoint["model"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         for param_group in optimizer.param_groups:
-            param_group['lr'] = lr
+            try:
+                param_group['lr'] = lr
+                param_group["initial_lr"] = lr
+            except:
+                pass 
         # lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
         cfg.lr_scheduler = cfg.lr_scheduler.lower()
         if cfg.lr_scheduler == "steplr":

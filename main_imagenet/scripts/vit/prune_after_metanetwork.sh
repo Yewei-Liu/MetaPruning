@@ -12,12 +12,14 @@
 
 MODEL="vit_b_16"  
 INDEX=1
-METANETWORK_INDEX=13
+METANETWORK_INDEX=22
 RUN_TYPE="prune_after_metanetwork"                
 NAME=ViT
 SPEED_UP=1.7000
-RESUME_EPOCH=200
+RESUME_EPOCH=-1
 LR=0.0001
+LR_MIN=0.000001
+CLIP_GRAD_NORM=1.0
 WEIGHT_DECAY=0.01
 EPOCHS=300
 BATCH_SIZE=128
@@ -67,6 +69,8 @@ torchrun \
     name=$NAME \
     resume_epoch=$RESUME_EPOCH \
     lr=$LR \
+    lr_min=$LR_MIN \
+    clip_grad_norm=$CLIP_GRAD_NORM \
     weight_decay=$WEIGHT_DECAY \
     lr_scheduler=$LR_SCHEDULER \
     opt=$OPT \

@@ -1046,6 +1046,9 @@ model_urls = _ModelURLs(
 )
 
 if __name__ == '__main__':
-    model = vit_b_16(pretrained=True)
-
+    model = vit_b_16(pretrained=True).to('cuda')
+    example_inputs = torch.ones((1, 3, 224, 224)).to('cuda')
+    import torch_pruning as tp
+    base_ops, base_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
+    print(base_ops, base_params)    
     # print(model)
