@@ -28,30 +28,13 @@ Meta-Training Pipeline:
 ## 🚀 Getting Started
 
 - git clone or download our code
-- create the conda env using (1) or (2)
-
-(1) main (change the cuda version as you need)
+- create the conda env using
 ```bash
 conda create -n MetaPruning python=3.9 -y
 conda activate MetaPruning
-conda install pytorch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1  pytorch-cuda=11.8 -c pytorch -c nvidia -y
-conda install pyg==2.3.0 pytorch-scatter -c pyg -y
-pip install torch_geometric==2.3.0
-pip install hydra-core einops opencv-python 
-pip install torch-pruning 
-pip install datasets 
-pip install importlib_metadata
-pip install termcolor
-pip install h5py
-```
-
-(2) main_imagenet (change the cuda version as you need)
-```bash
-conda create -n MetaPruning python=3.9 -y
-conda activate MetaPruning
-pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu118
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
 pip install torch_geometric
-pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.4.0+cu118.html
+pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.5.1+cu121.html
 pip install hydra-core einops opencv-python 
 pip install torch-pruning 
 pip install datasets 
@@ -60,7 +43,7 @@ pip install termcolor
 pip install h5py
 ```
 
-- After finishing (1) or (2), install our package
+- After finishing, install in editable mode
 ```bash
 cd MetaPruning
 pip install -e .
@@ -105,3 +88,46 @@ See ['main_imagenet/README.md'](main_imagenet/README.md) for our implementation 
 
 
 
+<!-- ## 🚀 Getting Started
+
+- git clone or download our code
+- create the conda env using (1) or (2)
+
+(1) main (change the cuda version as you need)
+```bash
+conda create -n MetaPruning python=3.9 -y
+conda activate MetaPruning
+conda install pytorch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1  pytorch-cuda=12.1 -c pytorch -c nvidia -y
+conda install pyg==2.3.0 pytorch-scatter -c pyg -y
+pip install torch_geometric==2.3.0
+pip install hydra-core einops opencv-python 
+pip install torch-pruning 
+pip install datasets 
+pip install importlib_metadata
+pip install termcolor
+pip install h5py
+```
+
+(2) main_imagenet (change the cuda version as you need)
+```bash
+conda create -n MetaPruning python=3.9 -y
+conda activate MetaPruning
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+pip install torch_geometric
+pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.5.1+cu121.html
+pip install hydra-core einops opencv-python 
+pip install torch-pruning 
+pip install datasets 
+pip install importlib_metadata
+pip install termcolor
+pip install h5py
+```
+
+
+
+
+- After finishing (1) or (2), install our package
+```bash
+cd MetaPruning
+pip install -e .
+``` -->

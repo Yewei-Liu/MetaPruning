@@ -15,7 +15,7 @@ nvidia-smi
 MODEL="vit_b_16"  
 INDEX=1
 RUN_TYPE="train_from_scratch"                 
-NAME=FinalViT
+NAME=ViT
 PRETRAINED=True
 EPOCHS=1
 LR=0.0

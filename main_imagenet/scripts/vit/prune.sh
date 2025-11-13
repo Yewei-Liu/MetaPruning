@@ -21,7 +21,7 @@ MODEL="vit_b_16"
 INDEX=1
 RUN_TYPE="prune"               
 SPEED_UP=1.0370
-NAME=FinalViT
+NAME=ViT
 PRETRAINED=True
 CONFIG_NAME="base"              
         

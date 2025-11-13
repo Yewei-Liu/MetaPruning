@@ -1,9 +1,9 @@
 import torch
 import torch.nn.functional as F
 from copy import deepcopy
-from generate_dataset.resnet_family import MyResNet, resnet56
+from generate_dataset.resnet_family import MyResNet
 from generate_dataset.VGG_family import MyVGG
-from generate_dataset.resnet_deep_family import MyResNetDeep, myresnet50
+from generate_dataset.resnet_deep_family import MyResNetDeep, myresnet18, myresnet26, myresnet50, MyResNetDeepBasic
 from generate_dataset.vision_transformer import vit_b_16, my_vit_b_16
 
 
@@ -15,6 +15,10 @@ def state_dict_to_graph(model_name, state_dict, device=None):
         return resnet110_state_dict_to_graph(state_dict, device)
     elif model_name == 'VGG19':
         return VGG19_state_dict_to_graph(state_dict, device)
+    elif model_name == 'resnet18':
+        return resnet18_state_dict_to_graph(state_dict, device)
+    elif model_name == 'resnet26':
+        return resnet26_state_dict_to_graph(state_dict, device)
     elif model_name == 'resnet50':
         return resnet50_state_dict_to_graph(state_dict, device)
     elif model_name == 'vit_b_16':
@@ -29,6 +33,10 @@ def graph_to_state_dict(model_name, state_dict, node_index, node_features, edge_
         return resnet110_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
     elif model_name == 'VGG19':
         return VGG19_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
+    elif model_name == 'resnet18':
+        return resnet18_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
+    elif model_name == 'resnet26':
+        return resnet26_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
     elif model_name == 'resnet50':
         return resnet50_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
     elif model_name == 'vit_b_16':
@@ -43,6 +51,10 @@ def state_dict_to_model(model_name, state_dict, device='cuda'):
         return resnet110_state_dict_to_model(state_dict, device)
     elif model_name == 'VGG19':
         return VGG19_state_dict_to_model(state_dict, device)
+    elif model_name == 'resnet18':
+        return resnet18_state_dict_to_model(state_dict, device)
+    elif model_name == 'resnet26':
+        return resnet26_state_dict_to_model(state_dict, device)
     elif model_name == 'resnet50':
         return resnet50_state_dict_to_model(state_dict, device)
     elif model_name == 'vit_b_16':
@@ -357,6 +369,370 @@ def resnet110_state_dict_to_model(state_dict, device):
     res.load_state_dict(state_dict)
     return res
 
+def resnet18_state_dict_to_graph(state_dict, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    node_index = [0, 3]
+    node_features = torch.tensor([[1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]])
+    # Node feature matrix with shape [num_nodes, num_node_features]. 
+    # [batchnorm: weight, bias, running mean, running var
+    #  downsample batchnorm: weight, bias, running mean, running var],
+
+    edge_index_1 = None
+    edge_index_9 = None
+    edge_index_49 = None 
+    # Graph connectivity in COO format with shape [2, num_edges]. 
+
+    edge_features_1 = None 
+    edge_features_9 = None
+    edge_features_49 = None 
+    # Edge feature matrix with shape [num_edges, num_edge_features].
+    # [7 * 7 weight]   
+
+    t = 0
+    res = 0
+    new_node_features = None
+    state_dict = deepcopy(state_dict)
+    for key, val in state_dict.items():
+        if not isinstance(val, torch.Tensor):
+            val = torch.tensor(val)
+        if (t >= 42 and t < 48) or (t >= 72 and t < 78) or (t >= 102 and t < 108):
+            # Shortcut with weights
+            if t % 6 == 0:
+                edge_index_1 = torch.concatenate([edge_index_1, torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-4], node_index[-3])))])
+                new_edge_features = val.reshape(-1, 1)
+                edge_features_1 = torch.concatenate([edge_features_1, new_edge_features])
+            elif t % 6 == 1:
+                node_features[node_index[-2]: node_index[-1]][:, 4] = val
+            elif t % 6 == 2:
+                node_features[node_index[-2]: node_index[-1]][:, 5] = val
+            elif t % 6 == 3:
+                node_features[node_index[-2]: node_index[-1]][:, 6] = val
+            elif t % 6 == 4:
+                node_features[node_index[-2]: node_index[-1]][:, 7] = val
+        elif t >=  120:
+            # End
+            if t == 120:
+                node_index.append(node_index[-1] + len(val))
+                edge_index_1 = torch.concatenate([edge_index_1, torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))])
+                tmp = val.reshape(-1, 1)
+                edge_features_1 = torch.concatenate([edge_features_1, tmp])
+                new_node_features = torch.tile(torch.tensor([1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]), (len(val), 1))
+            elif t == 121:
+                new_node_features[:, 1] = val
+                node_features = torch.concatenate([node_features, new_node_features])
+            else:
+                break
+        elif t % 6 == 0:
+            node_index.append(node_index[-1] + len(val))
+            if val.shape[-1] == 1:
+                if edge_index_1 is not None:
+                    edge_index_1 = torch.concatenate([edge_index_1, torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))])
+                else:
+                    edge_index_1 = torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))
+                if edge_features_1 is not None:
+                    edge_features_1 = torch.concatenate([edge_features_1, val.reshape(-1, 1)])
+                else:
+                    edge_features_1 = val.reshape(-1, 1)
+            elif val.shape[-1] == 3:
+                if edge_index_9 is not None:
+                    edge_index_9 = torch.concatenate([edge_index_9, torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))])
+                else:
+                    edge_index_9 = torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))
+                if edge_features_9 is not None:
+                    edge_features_9 = torch.concatenate([edge_features_9, val.reshape(-1, 9)])
+                else:
+                    edge_features_9 = val.reshape(-1, 9)
+            else: # 7
+                if edge_index_49 is not None:
+                    edge_index_49 = torch.concatenate([edge_index_49, torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))])
+                else:
+                    edge_index_49 = torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))
+                if edge_features_49 is not None:
+                    edge_features_49 = torch.concatenate([edge_features_49, val.reshape(-1, 49)])
+                else:
+                    edge_features_49 = val.reshape(-1, 49)
+
+            new_node_features = torch.tile(torch.tensor([1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]), (len(val), 1))
+            # short cut without weights
+            if t != 0:
+                res = (res + 1) % 2
+                if len(node_index) >= 4 and res == 0 and node_index[-3] - node_index[-4] == node_index[-1] - node_index[-2]:
+                    x = y = node_index[-3] - node_index[-4]
+                    if edge_index_1 is not None:
+                        edge_index_1 = torch.concatenate([edge_index_1, torch.tensor([[node_index[-4] + i, node_index[-2] + i] for i in range(x)])])
+                    else:
+                        edge_index_1 = torch.tensor([[node_index[-4] + i, node_index[-2] + i] for i in range(x)])
+                    if edge_features_1 is not None:
+                        new_edge_features = torch.ones((x, 1)).to(edge_features_1.device)
+                        edge_features_1 = torch.concatenate([edge_features_1, new_edge_features])
+                    else:
+                        edge_features_1 = torch.ones((x, 1))
+        elif t % 6 == 1:
+            new_node_features[:, 0] = val
+        elif t % 6 == 2:
+            new_node_features[:, 1] = val
+        elif t % 6 == 3:
+            new_node_features[:, 2] = val
+        elif t % 6 == 4:
+            new_node_features[:, 3] = val
+        elif t % 6 == 5:
+            node_features = torch.concatenate([node_features, new_node_features])
+        t += 1
+    edge_index = torch.concatenate([edge_index_49, edge_index_9, edge_index_1], dim=0).T
+    edge_features_list = [edge_features_49.to(device), edge_features_9.to(device), edge_features_1.to(device)]
+    return node_index, node_features.to(device), edge_index.to(device), edge_features_list
+
+def resnet18_graph_to_state_dict(
+        origin_state_dict,
+        node_index : list, 
+        node_features : torch.tensor, 
+        edge_index : torch.tensor, 
+        edge_features_list : torch.tensor,
+        device = None
+        ):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    state_dict = deepcopy(origin_state_dict)
+    node_num = [node_index[i] - node_index[i-1] for i in range(1, len(node_index))]
+    edge_features_49, edge_features_9, edge_features_1 = edge_features_list
+    state_dict['conv1.weight'] = edge_features_49.reshape(node_num[1], node_num[0], 7, 7)
+    state_dict['bn1.weight'] = node_features[node_index[1]: node_index[2]][:, 0]
+    state_dict['bn1.bias'] = node_features[node_index[1]: node_index[2]][:, 1]
+    t = 6
+    res = 0
+    edge_idx_9 = 0
+    edge_idx_1 = 0
+    node_idx = 1
+    for key in list(state_dict.keys())[6: -3]:
+        if (t >= 42 and t < 48) or (t >= 72 and t < 78) or (t >= 102 and t < 108):
+            if t % 6 == 0:
+                edge_idx_1 = edge_idx_1 - node_num[node_idx] + node_num[node_idx - 2] * node_num[node_idx]
+                state_dict[key] = edge_features_1[edge_idx_1 - node_num[node_idx] * node_num[node_idx - 2]: edge_idx_1].reshape(node_num[node_idx], node_num[node_idx - 2], 1, 1)
+            elif t % 6 == 1:
+                state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 4]
+            elif t % 6 == 2:
+                state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 5]
+        elif t % 6 == 0:
+            res = (res + 1) % 2
+            state_dict[key] = edge_features_9[edge_idx_9: edge_idx_9 + node_num[node_idx] * node_num[node_idx + 1]].reshape(node_num[node_idx + 1], node_num[node_idx], 3, 3)
+            edge_idx_9 += node_num[node_idx] * node_num[node_idx + 1]
+            node_idx += 1
+            if res == 0:
+                edge_idx_1 += node_num[node_idx]
+        elif t % 6 == 1:
+            state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 0]
+        elif t % 6 == 2:
+            state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 1]
+        t += 1
+    edge_idx_1 += node_num[-1] * node_num[-2]
+    state_dict['fc.weight'] = edge_features_1[-node_num[-1] * node_num[-2]:].reshape(node_num[-1], node_num[-2])
+    state_dict['fc.bias'] = node_features[node_index[-2]: node_index[-1]][:, 1]
+    for key, val in state_dict.items():
+        state_dict[key] = val.to(device)
+    return state_dict
+
+def resnet18_state_dict_to_model(state_dict, device):
+    node_index = [0, 3]
+    t = 0
+    for key, val in state_dict.items():
+        if (t >= 42 and t < 48) or (t >= 72 and t < 78) or (t >= 102 and t < 108):
+            pass
+        elif t >=  120:
+            if t == 120:
+                node_index.append(node_index[-1] + len(val))
+            else:
+                break
+        elif t % 6 == 0:
+            node_index.append(node_index[-1] + len(val))
+        t += 1
+    node_num = [node_index[i + 1] - node_index[i] for i in range(len(node_index) - 1)]
+    res = MyResNetDeepBasic(node_num, [2, 2, 2, 2]).eval().to(device)
+    res.load_state_dict(state_dict)
+    return res
+
+
+def resnet26_state_dict_to_graph(state_dict, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    node_index = [0, 3]
+    node_features = torch.tensor([[1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]])
+    # Node feature matrix with shape [num_nodes, num_node_features]. 
+    # [batchnorm: weight, bias, running mean, running var
+    #  downsample batchnorm: weight, bias, running mean, running var],
+
+    edge_index_1 = None
+    edge_index_9 = None
+    edge_index_49 = None 
+    # Graph connectivity in COO format with shape [2, num_edges]. 
+
+    edge_features_1 = None 
+    edge_features_9 = None
+    edge_features_49 = None 
+    # Edge feature matrix with shape [num_edges, num_edge_features].
+    # [7 * 7 weight]   
+
+    t = 0
+    res = 0
+    new_node_features = None
+    state_dict = deepcopy(state_dict)
+    for key, val in state_dict.items():
+        if not isinstance(val, torch.Tensor):
+            val = torch.tensor(val)
+        if (t >= 24 and t < 30) or (t >= 66 and t < 72) or (t >= 108 and t < 114) or (t >= 150 and t < 156):
+            # Shortcut with weights
+            if t % 6 == 0:
+                edge_index_1 = torch.concatenate([edge_index_1, torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-5], node_index[-4])))])
+                new_edge_features = val.reshape(-1, 1)
+                edge_features_1 = torch.concatenate([edge_features_1, new_edge_features])
+            elif t % 6 == 1:
+                node_features[node_index[-2]: node_index[-1]][:, 4] = val
+            elif t % 6 == 2:
+                node_features[node_index[-2]: node_index[-1]][:, 5] = val
+            elif t % 6 == 3:
+                node_features[node_index[-2]: node_index[-1]][:, 6] = val
+            elif t % 6 == 4:
+                node_features[node_index[-2]: node_index[-1]][:, 7] = val
+        elif t >=  174:
+            # End
+            if t == 174:
+                node_index.append(node_index[-1] + len(val))
+                edge_index_1 = torch.concatenate([edge_index_1, torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))])
+                tmp = val.reshape(-1, 1)
+                edge_features_1 = torch.concatenate([edge_features_1, tmp])
+                new_node_features = torch.tile(torch.tensor([1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]), (len(val), 1))
+            elif t == 175:
+                new_node_features[:, 1] = val
+                node_features = torch.concatenate([node_features, new_node_features])
+            else:
+                break
+        elif t % 6 == 0:
+            node_index.append(node_index[-1] + len(val))
+            if val.shape[-1] == 1:
+                if edge_index_1 is not None:
+                    edge_index_1 = torch.concatenate([edge_index_1, torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))])
+                else:
+                    edge_index_1 = torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))
+                if edge_features_1 is not None:
+                    edge_features_1 = torch.concatenate([edge_features_1, val.reshape(-1, 1)])
+                else:
+                    edge_features_1 = val.reshape(-1, 1)
+            elif val.shape[-1] == 3:
+                if edge_index_9 is not None:
+                    edge_index_9 = torch.concatenate([edge_index_9, torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))])
+                else:
+                    edge_index_9 = torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))
+                if edge_features_9 is not None:
+                    edge_features_9 = torch.concatenate([edge_features_9, val.reshape(-1, 9)])
+                else:
+                    edge_features_9 = val.reshape(-1, 9)
+            else: # 7
+                if edge_index_49 is not None:
+                    edge_index_49 = torch.concatenate([edge_index_49, torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))])
+                else:
+                    edge_index_49 = torch.cartesian_prod(torch.tensor(range(node_index[-2], node_index[-1])), torch.tensor(range(node_index[-3], node_index[-2])))
+                if edge_features_49 is not None:
+                    edge_features_49 = torch.concatenate([edge_features_49, val.reshape(-1, 49)])
+                else:
+                    edge_features_49 = val.reshape(-1, 49)
+
+            new_node_features = torch.tile(torch.tensor([1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]), (len(val), 1))
+            # short cut without weights
+            if t != 0:
+                res = (res + 1) % 3
+                if len(node_index) >= 5 and res == 0 and node_index[-4] - node_index[-5] == node_index[-1] - node_index[-2]:
+                    x = y = node_index[-4] - node_index[-5]
+                    edge_index_1 = torch.concatenate([edge_index_1, torch.tensor([[node_index[-5] + i, node_index[-2] + i] for i in range(x)])])
+                    new_edge_features = torch.ones((x, 1)).to(edge_features_1.device)
+                    edge_features_1 = torch.concatenate([edge_features_1, new_edge_features])
+        elif t % 6 == 1:
+            new_node_features[:, 0] = val
+        elif t % 6 == 2:
+            new_node_features[:, 1] = val
+        elif t % 6 == 3:
+            new_node_features[:, 2] = val
+        elif t % 6 == 4:
+            new_node_features[:, 3] = val
+        elif t % 6 == 5:
+            node_features = torch.concatenate([node_features, new_node_features])
+        t += 1
+    edge_index = torch.concatenate([edge_index_49, edge_index_9, edge_index_1], dim=0).T
+    edge_features_list = [edge_features_49.to(device), edge_features_9.to(device), edge_features_1.to(device)]
+    return node_index, node_features.to(device), edge_index.to(device), edge_features_list
+
+def resnet26_graph_to_state_dict(
+        origin_state_dict,
+        node_index : list, 
+        node_features : torch.tensor, 
+        edge_index : torch.tensor, 
+        edge_features_list : torch.tensor,
+        device = None
+        ):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    state_dict = deepcopy(origin_state_dict)
+    node_num = [node_index[i] - node_index[i-1] for i in range(1, len(node_index))]
+    edge_features_49, edge_features_9, edge_features_1 = edge_features_list
+    state_dict['conv1.weight'] = edge_features_49.reshape(node_num[1], node_num[0], 7, 7)
+    state_dict['bn1.weight'] = node_features[node_index[1]: node_index[2]][:, 0]
+    state_dict['bn1.bias'] = node_features[node_index[1]: node_index[2]][:, 1]
+    t = 6
+    res = 0
+    edge_idx_9 = 0
+    edge_idx_1 = 0
+    node_idx = 1
+    for key in list(state_dict.keys())[6: -3]:
+        if (t >= 24 and t < 30) or (t >= 66 and t < 72) or (t >= 108 and t < 114) or (t >= 150 and t < 156):
+            if t % 6 == 0:
+                edge_idx_1 = edge_idx_1 - node_num[node_idx] + node_num[node_idx - 3] * node_num[node_idx]
+                state_dict[key] = edge_features_1[edge_idx_1 - node_num[node_idx] * node_num[node_idx - 3]: edge_idx_1].reshape(node_num[node_idx], node_num[node_idx - 3], 1, 1)
+            elif t % 6 == 1:
+                state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 4]
+            elif t % 6 == 2:
+                state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 5]
+        elif t % 6 == 0:
+            res = (res + 1) % 3
+            if res == 1 or res == 0:
+                state_dict[key] = edge_features_1[edge_idx_1: edge_idx_1 + node_num[node_idx] * node_num[node_idx + 1]].reshape(node_num[node_idx + 1], node_num[node_idx], 1, 1)
+                edge_idx_1 += node_num[node_idx] * node_num[node_idx + 1]
+            else:
+                state_dict[key] = edge_features_9[edge_idx_9: edge_idx_9 + node_num[node_idx] * node_num[node_idx + 1]].reshape(node_num[node_idx + 1], node_num[node_idx], 3, 3)
+                edge_idx_9 += node_num[node_idx] * node_num[node_idx + 1]
+            node_idx += 1
+            if res == 0:
+                edge_idx_1 += node_num[node_idx]
+        elif t % 6 == 1:
+            state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 0]
+        elif t % 6 == 2:
+            state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 1]
+        t += 1
+    edge_idx_1 += node_num[-1] * node_num[-2]
+    state_dict['fc.weight'] = edge_features_1[-node_num[-1] * node_num[-2]:].reshape(node_num[-1], node_num[-2])
+    state_dict['fc.bias'] = node_features[node_index[-2]: node_index[-1]][:, 1]
+    for key, val in state_dict.items():
+        state_dict[key] = val.to(device)
+    return state_dict
+
+def resnet26_state_dict_to_model(state_dict, device):
+    node_index = [0, 3]
+    t = 0
+    for key, val in state_dict.items():
+        if (t >= 24 and t < 30) or (t >= 66 and t < 72) or (t >= 108 and t < 114) or (t >= 150 and t < 156):
+            pass
+        elif t >=  174:
+            if t == 174:
+                node_index.append(node_index[-1] + len(val))
+            else:
+                break
+        elif t % 6 == 0:
+            node_index.append(node_index[-1] + len(val))
+        t += 1
+    node_num = [node_index[i + 1] - node_index[i] for i in range(len(node_index) - 1)]
+    res = MyResNetDeep(node_num, [2, 2, 2, 2]).eval().to(device)
+    res.load_state_dict(state_dict)
+    return res
 
 def resnet50_state_dict_to_graph(state_dict, device=None):
     if device is None:
@@ -516,7 +892,7 @@ def resnet50_graph_to_state_dict(
             state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 1]
         t += 1
     edge_idx_1 += node_num[-1] * node_num[-2]
-    state_dict['fc.weight'] = edge_features_1[-node_num[-1] * node_num[-2]:].reshape(node_num[-2], node_num[-1]).T
+    state_dict['fc.weight'] = edge_features_1[-node_num[-1] * node_num[-2]:].reshape(node_num[-1], node_num[-2])
     state_dict['fc.bias'] = node_features[node_index[-2]: node_index[-1]][:, 1]
     for key, val in state_dict.items():
         state_dict[key] = val.to(device)
@@ -537,7 +913,7 @@ def resnet50_state_dict_to_model(state_dict, device):
             node_index.append(node_index[-1] + len(val))
         t += 1
     node_num = [node_index[i + 1] - node_index[i] for i in range(len(node_index) - 1)]
-    res = MyResNetDeep(node_num).eval().to(device)
+    res = MyResNetDeep(node_num, [3, 4, 6, 3]).eval().to(device)
     res.load_state_dict(state_dict)
     return res
 
@@ -873,11 +1249,13 @@ def ViT_B_16_state_dict_to_model(state_dict, device):
     return vit
 
 if __name__ == "__main__":
-    model = vit_b_16()
-    origin_state_dict = model.state_dict()
-    # node_index, node_features, edge_index, edge_features_list = ViT_B_16_state_dict_to_graph(origin_state_dict, device='cpu')
-    new_model = ViT_B_16_state_dict_to_model(origin_state_dict, device='cpu')
-    for key in origin_state_dict.keys():
-        if not torch.equal(origin_state_dict[key], new_model.state_dict()[key]):
-            print(f"Key {key} not equal!")
+    model_name='resnet18'
+    res = myresnet18(1000)
+    node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, res.state_dict())
+    new_model = graph_to_model(model_name, res.state_dict(), node_index, node_features, edge_index, edge_features_list)
+    for key in res.state_dict().keys():
+        if not torch.equal(res.state_dict()[key], new_model.state_dict()[key]):
+            print(f"Not equal at {key}")
+            print(res.state_dict()[key])
+            print(new_model.state_dict()[key])
     print("Done!")

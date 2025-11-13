@@ -25,6 +25,7 @@ small_batch_dataset:
   seed: ${seed}
 
 dataset_model:
+  model_name: ${task.model_name}
   dataset_model_name: ${task.model_name}_on_${task.dataset.dataset_name}
   train_split: 0.8
   dataset_model_path: ../dataset_model/${task.dataset_model.dataset_model_name}/${method}

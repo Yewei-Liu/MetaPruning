@@ -10,11 +10,6 @@
 #SBATCH -o visualize.out
 #SBATCH -e visualize.err
 
-
-~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.__version__)"
-~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.is_available())"
-~/.conda/envs/MetaPruning/bin/python -c "import torch; print(torch.cuda.device_count())"
-
 MODEL="vit_b_16"  
 INDEX=1 
 METANETWORK_INDEX=22
