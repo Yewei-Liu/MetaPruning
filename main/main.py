@@ -6,15 +6,16 @@ import hydra
 from omegaconf import OmegaConf
 import os
 import collections
-from generate_dataset.resnet_deep_family import resnet50
 from utils.convert import graph_to_state_dict, state_dict_to_model, state_dict_to_graph, graph_to_model
 from generate_dataset.resnet_family import resnet56, resnet110
+from generate_dataset.resnet_deep_family import myresnet18, myresnet26
 from generate_dataset.VGG_family import vgg19_bn
 from utils.pruning import get_pruner, adaptive_pruning, pruning_one_step, progressive_pruning
 from utils.train import train, eval
 from utils.visualize import visualize_acc_speed_up_curve
 from utils.meta_train import meta_train, meta_eval
 from utils.seed import set_seed
+from utils.analyse import analyze_models, plot_activation_and_grad, plot_bn_stats, plot_conv_weight_norms, plot_global_taylor_and_ratio, heatmap_metric, scatter_corr_vs_norm, plot_conv_norms_by_layer, plot_conv_norm_ratio
 from data_loaders.get_dataset_model import get_dataset_model_loader
 from data_loaders.get_dataset import get_dataset_loader
 
@@ -33,6 +34,13 @@ def main(cfg):
         if index_list[0] == 0:
             index_list = index_list[1:]
             visualize_origin = True
+    elif cfg.run == 'analyse':
+        if cfg.index == 'train':
+            raise ValueError("must use : python main.py run=analyse index=<metanetwork_index> or <metanetwork_index_list> (index_list starts with 0 means analyse origin network without metanetwork, otherwise not)")
+        index_list = cfg.index
+        if isinstance(index_list, int):
+            index_list = [index_list]
+        index_list_name = ''.join(str(i)+'_' for i in index_list) 
     elif cfg.run == 'pruning_one_step': # pruning with only one metanetwork
         if cfg.index == 'train':
             raise ValueError("must use : python main.py run=pruning_one_step index=<metanetwork_index>")
@@ -106,7 +114,9 @@ def main(cfg):
         def get_new_model(metanetwork):
             if resume_path is not None:
                 return model
-            node_pred, edge_pred = metanetwork.forward(node_features.to(device), edge_index.to(device), edge_features.to(device))
+            node_pred, edge_pred = metanetwork.forward(node_features.to(device), 
+                                                       [ei.to(device) for ei in edge_index] if isinstance(edge_index, list) else edge_index.to(device), 
+                                                       [ef.to(device) for ef in edge_features] if isinstance(edge_features, list) else edge_features.to(device))
             new_model = graph_to_model(cfg.model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
             train(new_model, small_train_loader, big_test_loader, cfg.pruning.finetune.after_metanetwork.epochs,
                   cfg.pruning.finetune.after_metanetwork.lr, cfg.pruning.finetune.after_metanetwork.lr_decay_milestones,
@@ -129,6 +139,66 @@ def main(cfg):
                         cfg.visualize.marker, save_dir=cfg.visualize.save_path, name=f"{index_list_name}.png",
                         ylim=cfg.visualize.ylim, log=log, figsize=cfg.visualize.figsize, font_scale=cfg.visualize.font_scale, resume_path=resume_path)
     
+    elif run == 'analyse':
+        resume_path = os.path.join(cfg.analyse.save_path, f"{index_list_name}.pth")
+        resume_ckpt = None
+        if os.path.exists(resume_path):
+            resume_ckpt = torch.load(resume_path, weights_only=False)
+        else:
+            resume_path = None
+        save_dir = cfg.meta_train.save_path
+        all_files = os.listdir(save_dir)
+        model, origin_state_dict, info, node_index, node_features, edge_index, edge_features = next(iter(model_val_loader))
+        def load_metanetwork(index):
+            prefix = f"epoch_{index}"
+            matching_files = [
+            os.path.join(save_dir, file)
+            for file in all_files
+            if (file.startswith(prefix + '.') or file.startswith(prefix + '_')) and os.path.isfile(os.path.join(save_dir, file))
+            ]
+            if len(matching_files) == 0:
+                raise ValueError(f"no metanetwork found with index {index}")
+            elif len(matching_files) >= 2:
+                raise ValueError(f"More than one metanetwork found with index {index}")
+            metanetwork = torch.load(matching_files[0], weights_only=False)
+            return metanetwork
+        def get_new_model(metanetwork):
+            node_pred, edge_pred = metanetwork.forward(node_features.to(device), 
+                                                       [ei.to(device) for ei in edge_index] if isinstance(edge_index, list) else edge_index.to(device), 
+                                                       [ef.to(device) for ef in edge_features] if isinstance(edge_features, list) else edge_features.to(device))
+            new_model = graph_to_model(cfg.model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
+            train(new_model, small_train_loader, big_test_loader, cfg.pruning.finetune.after_metanetwork.epochs,
+                  cfg.pruning.finetune.after_metanetwork.lr, cfg.pruning.finetune.after_metanetwork.lr_decay_milestones,
+                  cfg.pruning.finetune.after_metanetwork.lr_decay_gamma, cfg.pruning.finetune.after_metanetwork.weight_decay,
+                  log=log, return_best=True, opt=cfg.pruning.opt)
+            return new_model
+
+        model_list = [model if resume_ckpt is None else resume_ckpt['origin_model']]
+        new_resume_ckpt = {'origin_model': model_list[0]}
+        label_list = ['origin']
+
+        for index in index_list:
+            if resume_ckpt is None:
+                metanetwork = load_metanetwork(index)
+                new_model = get_new_model(metanetwork)
+                model_list.append(new_model)
+                label_list.append(f'epoch_{index}')
+                new_resume_ckpt[f'epoch_{index}_model'] = new_model
+            else:
+                model_list.append(resume_ckpt[f'epoch_{index}_model'])
+                label_list.append(f'epoch_{index}')
+        if resume_path is None:
+            os.makedirs(os.path.join(cfg.analyse.save_path), exist_ok=True)
+            torch.save(new_resume_ckpt, os.path.join(cfg.analyse.save_path, f"{index_list_name}.pth"))
+        
+        res = analyze_models(model_list, big_test_loader, device, num_batches=10, bn_gamma_zero_threshold=0.001, entropy_bins=40)
+        print(res)
+        os.makedirs(os.path.join(cfg.analyse.save_path, index_list_name), exist_ok=True)
+        plot_conv_norms_by_layer(res, [0, 1], 'weight_l2', os.path.join(cfg.analyse.save_path, index_list_name))
+        plot_conv_norms_by_layer(res, [0, 1], 'weight_l1', os.path.join(cfg.analyse.save_path, index_list_name))
+        plot_conv_norm_ratio(res, 1, 0, 'weight_l2', os.path.join(cfg.analyse.save_path, index_list_name))
+        plot_conv_norm_ratio(res, 1, 0, 'weight_l1', os.path.join(cfg.analyse.save_path, index_list_name))
+
     elif run == 'pruning_one_step':
         save_dir = cfg.meta_train.save_path
         all_files = os.listdir(save_dir)
@@ -175,6 +245,8 @@ def main(cfg):
                                                 big_test_loader, cfg.initial_pruning_speed_up, method=method, log=log)
             current_speed_up *= speed_up
             train(model, small_train_loader, big_test_loader, 140, 0.01, "80, 120", log=log) 
+        elif cfg.task_name in ['resnet56(no_init_pruning)_on_CIFAR10']:
+            print("No init pruning.")
         else:
             raise NotImplementedError(f"task {cfg.task_name} is not supported for final pruning")
         
@@ -207,7 +279,9 @@ def main(cfg):
             raise NotImplementedError(f"task {cfg.task_name} is not supported for final visualization")
         model_list = [state_dict_to_model(cfg.model_name, model.state_dict())]
         node_index, node_features, edge_index, edge_features = state_dict_to_graph(cfg.model_name, model.state_dict())
-        node_pred, edge_pred = metanetwork.forward(node_features.to(device), edge_index.to(device), edge_features.to(device))
+        node_pred, edge_pred = metanetwork.forward(node_features.to(device), 
+                                                   [ei.to(device) for ei in edge_index] if isinstance(edge_index, list) else edge_index.to(device), 
+                                                   [ef.to(device) for ef in edge_features] if isinstance(edge_features, list) else edge_features.to(device))
         model = graph_to_model(cfg.model_name, model.state_dict(), node_index, node_pred, edge_index, edge_pred, device)
         train(model, small_train_loader, big_test_loader, cfg.pruning.finetune.after_metanetwork.epochs,
                 cfg.pruning.finetune.after_metanetwork.lr, cfg.pruning.finetune.after_metanetwork.lr_decay_milestones,
@@ -240,6 +314,10 @@ def main(cfg):
             torch.save(model, os.path.join(reproduce_dir, 'model.pth'))
         elif cfg.task_name == 'VGG19_on_CIFAR100':
             model = vgg19_bn(num_classes=100)
+            train(model, small_train_loader, big_test_loader, 200, 0.1, "100, 150, 180", log=log)
+            torch.save(model, os.path.join(reproduce_dir, 'model.pth'))
+        elif cfg.task_name == 'resnet56(no_init_pruning)_on_CIFAR10':
+            model = resnet56(10)
             train(model, small_train_loader, big_test_loader, 200, 0.1, "100, 150, 180", log=log)
             torch.save(model, os.path.join(reproduce_dir, 'model.pth'))
         else:

@@ -76,6 +76,9 @@ visualize:
   figsize: [10, 10]
   font_scale: 1.5
 
+analyse:
+  save_path: 'save/analyse/${task.dataset_model.dataset_model_name}/${method}_${task.meta_train.alpha}/${name}/'
+
 pruning:
   pruning_index: 2.3
   method: ${method}

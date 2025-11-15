@@ -74,7 +74,7 @@ We take `resnet56_on_CIFAR10` as example, in ['configs/task/resnet56_on_CIFAR10.
 
 To meta_train, run:
 ```bash
-python main.py run=meta_train task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer name=Test 
+python main.py run=meta_train task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer name=Test
 ```
 
 For better performance, search for a reasonable `lr_decay_milestone` first. See Appendix D.1.2 `Meta-Training Milestone` in our paper.
@@ -146,6 +146,11 @@ Finally, if we want to pruning with speed up 2.5x, we can run :
 python main.py task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer run=pruning_final name=Test reproduce_index=3 index=2.5
 ```
 
+### Moreover
+```bash
+python main.py task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer name=Test run=analyse index=50
+```
+Use this to analyse statistics (l1 norm, l2 norm, correlation, etc.)
 
 
 

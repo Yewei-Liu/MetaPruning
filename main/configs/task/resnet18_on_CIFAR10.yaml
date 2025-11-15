@@ -1,11 +1,11 @@
 _recursive_: True 
 
-model_name: resnet56
-task_name: ${task.model_name}(no_init_pruning)_on_${task.dataset.dataset_name}
-initial_pruning_speed_up: 1.32
+model_name: resnet18
+task_name: ${task.model_name}_on_${task.dataset.dataset_name}
+initial_pruning_speed_up: 1.7
 
 dataset:
-  dataset_name: CIFAR10
+  dataset_name: CIFAR10(224)
   num_workers: 4
   big_batch: 500
   small_batch: 128
@@ -26,7 +26,7 @@ small_batch_dataset:
 
 dataset_model:
   model_name: ${task.model_name}
-  dataset_model_name: ${task.model_name}(no_init_pruning)_on_${task.dataset.dataset_name}
+  dataset_model_name: ${task.model_name}_on_${task.dataset.dataset_name}
   train_split: 0.8
   dataset_model_path: ../dataset_model/${task.dataset_model.dataset_model_name}/${method}
   seed: ${seed}
@@ -34,7 +34,7 @@ dataset_model:
 
 meta_train:
   epochs: 100
-  lr : 0.001 
+  lr : 0.01 
   lr_decay_milestones : "3"
   lr_decay_gamma : 0.1
   weight_decay : 5e-4
@@ -59,59 +59,37 @@ meta_train:
     weight_decay: ${task.pruning.finetune.after_metanetwork.weight_decay}
 
 metanetwork:
-  _target_: nn.GNN.MyGNN
+  _target_: nn.GNN.MyGNN_resnet50
   _recursive_: True
-  num_layer: 8
-  hiddim: 64
+  num_layer: 6
+  hiddim: 16
   in_node_dim: 8
-  in_edge_dim: 9
-  node_res_ratio: 0.01
-  edge_res_ratio: 0.01
+  node_res_ratio: 0.0005
+  edge_res_ratio: 0.0005
 
 visualize:
-  max_speed_up: 3.0
+  max_speed_up: 5.0
   marker: 'o'
   save_path: 'save/visualize/${task.dataset_model.dataset_model_name}/${method}_${task.meta_train.alpha}/${name}/'
   ylim: [0.8, 1.0]
   figsize: [10, 10]
   font_scale: 1.5
 
-analyse:
-  save_path: 'save/analyse/${task.dataset_model.dataset_model_name}/${method}_${task.meta_train.alpha}/${name}/'
-
 pruning:
-  pruning_index: 2.5
+  pruning_index: 2.3
   method: ${method}
   opt: 'sgd'
   finetune:
-    # after_pruning:
-    #   epochs: 140
-    #   lr: 0.01
-    #   lr_decay_milestones: "80,120"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_pruning:
-    #   epochs: 100
-    #   lr: 0.01
-    #   lr_decay_milestones: "60,90"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_metanetwork:
-    #   epochs: 100
-    #   lr: 0.01
-    #   lr_decay_milestones: "60,90"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
     after_pruning:
-      epochs: 60
+      epochs: 140
       lr: 0.01
-      lr_decay_milestones: "35,55"
+      lr_decay_milestones: "80,120"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
     after_metanetwork:
-      epochs: 60
+      epochs: 100
       lr: 0.01
-      lr_decay_milestones: "35,55"
+      lr_decay_milestones: "60,90"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
 
