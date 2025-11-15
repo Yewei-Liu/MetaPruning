@@ -7,7 +7,7 @@ initial_pruning_speed_up: 1.8
 dataset:
   dataset_name: CIFAR10(224)
   num_workers: 4
-  big_batch: 500
+  big_batch: 1
   small_batch: 128
   dataset_path: ../dataset/${task.dataset.dataset_name}
   seed: ${seed}
@@ -44,6 +44,7 @@ meta_train:
   pruner_reg : 10
   save_every_epoch : 1
   warm_up : 0
+  less_vram_mode: True
   model_name : ${task.model_name}
   dataset_name : ${task.dataset.dataset_name}
   save_path: 'save/metanetwork/${task.dataset_model.dataset_model_name}/${method}_${task.meta_train.alpha}/${name}/'

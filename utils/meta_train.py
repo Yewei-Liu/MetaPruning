@@ -160,7 +160,15 @@ def meta_train(
                 state_dict = graph_to_state_dict(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
                 losses = 0.0
                 optimizer.zero_grad()
-                for j, (data, target) in enumerate(big_data_train_loader):
+                if not cfg.less_vram_mode:
+                    for j, (data, target) in enumerate(big_data_train_loader):
+                        data, target = data.to(device), target.to(device)   
+                        out = functional_call(model, state_dict, data)
+                        loss = F.cross_entropy(out, target)
+                        losses += loss.item()
+                        loss.backward(retain_graph=True)
+                else:
+                    data, target = next(iter(big_data_train_loader))
                     data, target = data.to(device), target.to(device)   
                     out = functional_call(model, state_dict, data)
                     loss = F.cross_entropy(out, target)

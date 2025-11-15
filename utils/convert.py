@@ -1249,13 +1249,17 @@ def ViT_B_16_state_dict_to_model(state_dict, device):
     return vit
 
 if __name__ == "__main__":
-    model_name='resnet18'
-    res = myresnet18(1000)
-    node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, res.state_dict())
-    new_model = graph_to_model(model_name, res.state_dict(), node_index, node_features, edge_index, edge_features_list)
-    for key in res.state_dict().keys():
-        if not torch.equal(res.state_dict()[key], new_model.state_dict()[key]):
-            print(f"Not equal at {key}")
-            print(res.state_dict()[key])
-            print(new_model.state_dict()[key])
-    print("Done!")
+    print("Allocated:", torch.cuda.memory_allocated() / 1024**2, "MB")
+    print("Reserved:", torch.cuda.memory_reserved() / 1024**2, "MB")
+    model_name='resnet26'
+    res = myresnet26(1000)
+    node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, res.state_dict(), device='cuda')
+    print("Allocated:", torch.cuda.memory_allocated() / 1024**2, "MB")
+    print("Reserved:", torch.cuda.memory_reserved() / 1024**2, "MB")
+    # new_model = graph_to_model(model_name, res.state_dict(), node_index, node_features, edge_index, edge_features_list)
+    # for key in res.state_dict().keys():
+    #     if not torch.equal(res.state_dict()[key], new_model.state_dict()[key]):
+    #         print(f"Not equal at {key}")
+    #         print(res.state_dict()[key])
+    #         print(new_model.state_dict()[key])
+    # print("Done!")
