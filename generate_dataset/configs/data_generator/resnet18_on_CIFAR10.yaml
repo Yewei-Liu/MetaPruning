@@ -1,5 +1,5 @@
 model_name: resnet18
-dataset_name: CIFAR10
+dataset_name: CIFAR10(224)
 big_batch_size: 500
 small_batch_size: 128
 num_workers: 4

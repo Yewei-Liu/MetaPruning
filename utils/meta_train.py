@@ -66,7 +66,9 @@ def meta_eval(
         if log and verbose:
             logger.info("Origin :")
         with torch.no_grad():
-            node_pred, edge_pred = metanetwork.forward(node_features.to(device), edge_index.to(device), edge_features.to(device))
+            node_pred, edge_pred = metanetwork.forward(node_features.to(device), 
+                                                       [ei.to(device) for ei in edge_index] if isinstance(edge_index, list) else edge_index.to(device), 
+                                                       [ef.to(device) for ef in edge_features] if isinstance(edge_features, list) else edge_features.to(device))
             model = graph_to_model(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
         train(model, small_train_data_loader, big_val_data_loader, epochs, lr, lr_decay_milestones, 
               lr_decay_gamma, weight_decay, log=verbose, return_best=True)
@@ -152,7 +154,9 @@ def meta_train(
             def onetrainstep():
                 model.to(device)
                 pruner = get_pruner(model, torch.ones((1, 3, 32, 32)).to(device), pruner_reg, dataset_name, method=method)
-                node_pred, edge_pred = metanetwork.forward(node_features.to(device), edge_index.to(device), edge_features.to(device))
+                node_pred, edge_pred = metanetwork.forward(node_features.to(device), 
+                                                           [ei.to(device) for ei in edge_index] if isinstance(edge_index, list) else edge_index.to(device), 
+                                                           [ef.to(device) for ef in edge_features] if isinstance(edge_features, list) else edge_features.to(device))
                 state_dict = graph_to_state_dict(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
                 losses = 0.0
                 optimizer.zero_grad()

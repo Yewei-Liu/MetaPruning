@@ -32,7 +32,7 @@ def progressive_pruning(
     model.eval().to(device)
     if dataset_name.lower() in ['cifar10', 'cifar100', 'svhn']:
         example_inputs = torch.ones((1, 3, 32, 32)).to(device)
-    elif dataset_name.lower() in ['imagenet']:
+    elif dataset_name.lower() in ['imagenet', 'cifar10(224)']:
         example_inputs = torch.ones((1, 3, 224, 224)).to(device)
     else:
         raise NotImplementedError(f"Dataset {dataset_name} is not supported.")

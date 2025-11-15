@@ -55,6 +55,37 @@ def get_dataset_loader(cfg, log=False):
                 trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers)
             test_loader = torch.utils.data.DataLoader(
                 testset, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers)
+    elif cfg.dataset_name == 'CIFAR10(224)':
+        transform_train = transforms.Compose([
+            transforms.Resize(256),          # Resize first for RandomCrop
+            transforms.RandomCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.2010, 0.1971)),
+        ])
+        transform_test = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.2010, 0.1971)),
+        ])
+        trainset = torchvision.datasets.CIFAR10(
+            root=cfg.dataset_path, train=True, download=True, transform=transform_train)
+        testset = torchvision.datasets.CIFAR10( 
+            root=cfg.dataset_path, train=False, download=True, transform=transform_test)
+        if use_seed:
+            train_loader = torch.utils.data.DataLoader(
+                trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers,
+                worker_init_fn=seed_worker, generator=generator)
+            test_loader = torch.utils.data.DataLoader(
+                testset, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers,
+                worker_init_fn=seed_worker, generator=generator)
+        else:
+            train_loader = torch.utils.data.DataLoader(
+                trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers)
+            test_loader = torch.utils.data.DataLoader(
+                testset, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers)
+        
     elif cfg.dataset_name == 'CIFAR100':
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),

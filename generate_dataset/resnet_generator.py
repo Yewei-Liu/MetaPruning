@@ -124,7 +124,7 @@ def main(cfg):
     cfg_dataset = cfg.small_batch_dataset
     cfg = cfg.data_generator.cfg
     train_loader, test_loader = get_dataset_loader(cfg_dataset)
-    model = myresnet26(dataset_num_classes_dict[cfg_dataset.dataset_name])
+    model = myresnet18(dataset_num_classes_dict[cfg_dataset.dataset_name])
     train_acc, train_loss, val_acc, val_loss = train(model, train_loader, test_loader, 200, 0.1, "100,150,180", log=True)
     visualize_acc_speed_up_curve(model, cfg.dataset_name, 'origin', test_loader, 1.0, 10.0, cfg.method, save_dir='./', name=f'{cfg.model_name}.png')
 
