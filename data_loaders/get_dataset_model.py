@@ -11,6 +11,7 @@ import random
 
 def get_dataset_model_loader(cfg):
     model_name = cfg.model_name
+    print(cfg.dataset_model_path)
     dataset_model = Dataset.load_from_disk(cfg.dataset_model_path)
     datadict = dataset_model.train_test_split(test_size=(1.0 - cfg.train_split), shuffle=False)
     model_train_dataset = DatasetModel(model_name, datadict["train"])

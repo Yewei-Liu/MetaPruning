@@ -2,6 +2,7 @@ from functools import partial
 import torch
 import torch_pruning as tp
 from utils.dict import dataset_num_classes_dict
+from utils.unstructural_pruner import Pruner
 
 def _unwrap_model(model):
     """Return the real model if wrapped by DP/DDP; otherwise the model itself."""
@@ -55,6 +56,20 @@ def get_pruner(model,
     elif method == "group_l2_norm_max_normalizer":
         imp = tp.importance.GroupMagnitudeImportance(p=2, group_reduction='mean', normalizer='max') 
         pruner_entry = partial(tp.pruner.GroupNormPruner, reg=reg, global_pruning=global_pruning)
+    elif method == "unstructured_l1_norm":
+        pruner = Pruner(
+            base_model,
+            method_str="unstructured_l1_norm",
+            reg_lambda=reg,
+        )
+        return pruner
+    elif method == "nmsparsity":
+        pruner = Pruner(
+            base_model,
+            method_str="nmsparsity",
+            reg_lambda=reg,
+        )
+        return pruner
     else:
         raise NotImplementedError(f"Method {method} not implemented !")
     

@@ -10,9 +10,9 @@ from utils.convert import graph_to_state_dict, state_dict_to_model, state_dict_t
 from generate_dataset.resnet_family import resnet56, resnet110
 from generate_dataset.resnet_deep_family import myresnet18, myresnet26
 from generate_dataset.VGG_family import vgg19_bn
-from utils.pruning import get_pruner, adaptive_pruning, pruning_one_step, progressive_pruning
+from utils.pruning import get_pruner, adaptive_pruning, pruning_one_step, progressive_pruning, unstructured_pruning_one_step
 from utils.train import train, eval
-from utils.visualize import visualize_acc_speed_up_curve
+from utils.visualize import visualize_acc_speed_up_curve, visualize_acc_pruned_params_curve
 from utils.meta_train import meta_train, meta_eval
 from utils.seed import set_seed
 from utils.analyse import analyze_models, plot_activation_and_grad, plot_bn_stats, plot_conv_weight_norms, plot_global_taylor_and_ratio, heatmap_metric, scatter_corr_vs_norm, plot_conv_norms_by_layer, plot_conv_norm_ratio
@@ -50,6 +50,12 @@ def main(cfg):
             raise ValueError("must use : python main.py run=pruning_final index=<pruning_index>")
         reproduce_dir = os.path.join('final', cfg.task.task_name, f'{cfg.method}', f'reproduce_{cfg.reproduce_index}')
         pruning_index = cfg.index
+    elif cfg.run == 'unstructured_pruning_final':
+        assert cfg.method.startswith('unstructured'), f"only unstructured pruning is supported in unstructured_pruning_final, method now {cfg.method}"
+        if cfg.index == 'train':
+            raise ValueError("must use : python main.py run=pruning_final index=pruing_amount")
+        reproduce_dir = os.path.join('final', cfg.task.task_name, f'{cfg.method}', f'reproduce_{cfg.reproduce_index}')
+        pruning_amount = cfg.index
     elif cfg.run == 'visualize_final':
         if cfg.index == 'train':
             raise ValueError("must use : python main.py run=visualize_final index=<reproduce_index>")
@@ -112,6 +118,7 @@ def main(cfg):
             metanetwork = torch.load(matching_files[0], weights_only=False)
             return metanetwork
         def get_new_model(metanetwork):
+            freeze_zero = True if method.startswith('unstructured') else False
             if resume_path is not None:
                 return model
             node_pred, edge_pred = metanetwork.forward(node_features.to(device), 
@@ -121,7 +128,7 @@ def main(cfg):
             train(new_model, small_train_loader, big_test_loader, cfg.pruning.finetune.after_metanetwork.epochs,
                   cfg.pruning.finetune.after_metanetwork.lr, cfg.pruning.finetune.after_metanetwork.lr_decay_milestones,
                   cfg.pruning.finetune.after_metanetwork.lr_decay_gamma, cfg.pruning.finetune.after_metanetwork.weight_decay,
-                  log=log, return_best=True, opt=cfg.pruning.opt)
+                  log=log, return_best=True, opt=cfg.pruning.opt, freeze_zero=freeze_zero)
             return new_model
         model_list = []
         label_list = []
@@ -134,10 +141,16 @@ def main(cfg):
             new_model = get_new_model(metanetwork)
             model_list.append(new_model)
             label_list.append(f'epoch_{index}')
-        visualize_acc_speed_up_curve( model_list, cfg.dataset.dataset_name, label_list,
-                        big_test_loader, [info['current_speed_up'] for i in range(len(model_list))], cfg.visualize.max_speed_up, method,
-                        cfg.visualize.marker, save_dir=cfg.visualize.save_path, name=f"{index_list_name}.png",
-                        ylim=cfg.visualize.ylim, log=log, figsize=cfg.visualize.figsize, font_scale=cfg.visualize.font_scale, resume_path=resume_path)
+        if method.startswith('unstructured'):
+            visualize_acc_pruned_params_curve( model_list, cfg.dataset.dataset_name, label_list,
+                            big_test_loader, 0.95, method,
+                            cfg.visualize.marker, save_dir=cfg.visualize.save_path, name=f"{index_list_name}.png",
+                            ylim=cfg.visualize.ylim, log=log, figsize=cfg.visualize.figsize, font_scale=cfg.visualize.font_scale, resume_path=resume_path)
+        else:
+            visualize_acc_speed_up_curve( model_list, cfg.dataset.dataset_name, label_list,
+                            big_test_loader, [info['current_speed_up'] for i in range(len(model_list))], cfg.visualize.max_speed_up, method,
+                            cfg.visualize.marker, save_dir=cfg.visualize.save_path, name=f"{index_list_name}.png",
+                            ylim=cfg.visualize.ylim, log=log, figsize=cfg.visualize.figsize, font_scale=cfg.visualize.font_scale, resume_path=resume_path)
     
     elif run == 'analyse':
         resume_path = os.path.join(cfg.analyse.save_path, f"{index_list_name}.pth")
@@ -163,6 +176,7 @@ def main(cfg):
             metanetwork = torch.load(matching_files[0], weights_only=False)
             return metanetwork
         def get_new_model(metanetwork):
+            freeze_zero = True if method.startswith('unstructured') else False
             node_pred, edge_pred = metanetwork.forward(node_features.to(device), 
                                                        [ei.to(device) for ei in edge_index] if isinstance(edge_index, list) else edge_index.to(device), 
                                                        [ef.to(device) for ef in edge_features] if isinstance(edge_features, list) else edge_features.to(device))
@@ -170,7 +184,7 @@ def main(cfg):
             train(new_model, small_train_loader, big_test_loader, cfg.pruning.finetune.after_metanetwork.epochs,
                   cfg.pruning.finetune.after_metanetwork.lr, cfg.pruning.finetune.after_metanetwork.lr_decay_milestones,
                   cfg.pruning.finetune.after_metanetwork.lr_decay_gamma, cfg.pruning.finetune.after_metanetwork.weight_decay,
-                  log=log, return_best=True, opt=cfg.pruning.opt)
+                  log=log, return_best=True, opt=cfg.pruning.opt, freeze_zero=freeze_zero)
             return new_model
 
         model_list = [model if resume_ckpt is None else resume_ckpt['origin_model']]
@@ -253,6 +267,27 @@ def main(cfg):
         model = pruning_one_step(model, cfg.model_name, cfg.dataset.dataset_name, info, model.state_dict(), 
                                             big_train_loader, small_train_loader, big_test_loader, metanetwork,
                                             cfg.pruning, current_speed_up, log=log)
+    
+    elif run == 'unstructured_pruning_final':
+        model = torch.load(os.path.join(reproduce_dir, 'model.pth'), weights_only=False)
+        if isinstance(model, collections.OrderedDict):
+            model = state_dict_to_model(cfg.model_name, model)
+        model.to(device)
+        train_acc, train_loss = eval(model, big_train_loader)
+        val_acc, val_loss = eval(model, big_test_loader)
+        info = {'train_acc': train_acc, 'train_loss': train_loss, 'val_acc': val_acc, 'val_loss': val_loss}
+        logging.info(f"Before pruning:\n{info}")
+        file_path = os.path.join(reproduce_dir, 'metanetwork.pth')
+        if os.path.isfile(file_path):
+            metanetwork = torch.load(file_path, weights_only=False)
+        else:
+            print(f"Error: File '{file_path}' not found. Don't use metanetwork.")
+            metanetwork = -1
+        model = unstructured_pruning_one_step(model, cfg.model_name, cfg.dataset.dataset_name, info, model.state_dict(), 
+                                            big_train_loader, small_train_loader, big_test_loader, metanetwork,
+                                            method, pruning_amount, cfg.pruning, log, device)
+
+        
         
             
     elif run == 'visualize_final':

@@ -8,6 +8,7 @@ import numpy as np
 from utils.pruning import get_pruner
 import torch_pruning as tp
 from utils.mylogging import get_logger
+from utils.unstructural_flops import count_model_flops_and_params
 from utils.train import eval
 import os
 import pickle
@@ -135,3 +136,122 @@ def visualize_acc_speed_up_curve(
         logger.info("End visualizing")
     return acc_list_dict, speed_up_list_dict
 
+
+def get_acc_pruned_params_list(
+        model,
+        dataset_name, 
+        test_loader,
+        max_pruned_params = 0.95,
+        method = 'unstructured_l1_norm'
+):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model.eval().to(device)
+    example_inputs = torch.ones((1, 3, 32, 32)).to(device)
+    pruner = get_pruner(model, example_inputs, 0.1, dataset_name, method=method)
+    base_ops, base_params = tp.utils.count_ops_and_params(model, example_inputs=example_inputs)
+    val_acc, val_loss = eval(model, test_loader, device)
+    acc_list = [val_acc]
+    pruned_params_list = [0.0]
+    while pruned_params_list[-1] < max_pruned_params:
+        pruner.step()
+        _, left_ops, _, left_params, _, _ = count_model_flops_and_params(model, example_inputs, verbose=False)
+        val_acc, val_loss = eval(model, test_loader, device)
+        current_pruned_params = float(base_params - left_params) / base_params
+        acc_list.append(val_acc)
+        pruned_params_list.append(current_pruned_params)
+    del pruner
+    return acc_list, pruned_params_list
+
+def visualize_acc_pruned_params_curve(
+        models,
+        dataset_name,
+        labels,
+        test_loader,
+        max_pruned_params=0.95,
+        method='unstructured_l1_norm', 
+        marker='o',
+        save_dir='tmp/',
+        name='tmp.png',
+        ylim=(0.0, 1.0),
+        log=True,
+        figsize=(20, 20),
+        font_scale=1.5,  # New parameter to control font scaling
+        resume_path=None,
+):
+    os.makedirs(save_dir, exist_ok=True)
+    if log:
+        logger = get_logger("Visualize param speed up curve")
+        logger.info("Start visualizing")
+    
+    # Set larger font sizes
+    plt.rcParams.update({
+        'font.size': 12 * font_scale,           # General font size
+        'axes.titlesize': 16 * font_scale,      # Title font size
+        'axes.labelsize': 14 * font_scale,      # X and Y labels font size
+        'xtick.labelsize': 12 * font_scale,     # X-axis tick labels
+        'ytick.labelsize': 12 * font_scale,      # Y-axis tick labels
+        'legend.fontsize': 12 * font_scale,      # Legend font size
+        'figure.titlesize': 18 * font_scale      # Figure title size
+    })
+    
+    plt.figure(figsize=figsize)
+    
+    if resume_path is not None:
+        if log:
+            logger.info(f"Load existing statistics from {resume_path}, no need to recalculate.")
+        with open(resume_path, "rb") as f:
+            t = pickle.load(f)
+            acc_list_dict = t['acc_list_dict']
+            pruned_params_list_dict = t['pruned_params_list_dict']
+    else:
+        acc_list_dict = {}
+        pruned_params_list_dict = {}
+            
+    
+    if isinstance(models, list):
+        for i, m in enumerate(models):
+            if resume_path is not None:
+                acc_list, pruned_params_list = acc_list_dict[i], pruned_params_list_dict[i]
+            else:
+                acc_list, pruned_params_list = get_acc_pruned_params_list(m, dataset_name, test_loader, max_pruned_params=max_pruned_params, method=method)
+                acc_list_dict[i], pruned_params_list_dict[i] = acc_list, pruned_params_list
+            plt.plot(pruned_params_list, acc_list, marker=marker, label=labels[i], markersize=4*font_scale, linewidth=2*font_scale)
+            if log:
+                logger.info(f"Model {i+1}/{len(models)} visualized")
+    else:
+        if resume_path is not None:
+            acc_list, pruned_params_list = acc_list_dict[0], pruned_params_list_dict[0]
+        else:
+            acc_list, pruned_params_list = get_acc_pruned_params_list(m, dataset_name, test_loader, max_pruned_params=max_pruned_params, method=method)
+            acc_list_dict[0], pruned_params_list_dict[0] = acc_list, pruned_params_list 
+        plt.plot(pruned_params_list, acc_list, marker=marker, label=labels, markersize=4*font_scale, linewidth=2*font_scale)
+    
+    plt.xlabel('Pruned Params', fontsize=14 * font_scale)  # You can override individual elements if needed
+    plt.ylabel('Test Acc', fontsize=14 * font_scale)
+    plt.title('Test Acc vs. Pruned Params', fontsize=16 * font_scale)
+    plt.xlim(0.0, max_pruned_params)
+    plt.ylim(ylim)
+    plt.locator_params(axis='y', nbins=20)
+    plt.grid()
+    
+    # Make legend larger
+    plt.legend(loc='upper right', prop={'size': 12 * font_scale})
+    
+    # Adjust tick label size
+    plt.tick_params(axis='both', which='major', labelsize=12 * font_scale)
+    
+    plt.savefig(os.path.join(save_dir, name), dpi=300, bbox_inches='tight')  # Higher DPI and tight layout
+    plt.close()  # Close the figure to free memory
+    
+    if resume_path is None:
+        save_path = os.path.join(save_dir, f"{os.path.splitext(name)[0]}.pkl")
+        with open(save_path, 'wb') as f:
+            pickle.dump({'acc_list_dict': acc_list_dict, 'pruned_params_list_dict': pruned_params_list_dict}, f)
+        if log:
+            logger.info(f"Statistics saved to {save_path}")
+    
+    if log:
+        for i in range(len(acc_list_dict)):
+            logger.info({f"{pruned_params_list_dict[i][j]:.2f}": f"{acc_list_dict[i][j]:.4f}" for j in range(len(acc_list_dict[i]))})
+        logger.info("End visualizing")
+    return acc_list_dict, pruned_params_list_dict

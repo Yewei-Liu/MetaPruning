@@ -85,48 +85,60 @@ pruning:
   method: ${method}
   opt: 'sgd'
   finetune:
-    # after_pruning:
-    #   epochs: 140
-    #   lr: 0.01
-    #   lr_decay_milestones: "80,120"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_pruning:
-    #   epochs: 100
-    #   lr: 0.01
-    #   lr_decay_milestones: "60,90"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_metanetwork:
-    #   epochs: 100
-    #   lr: 0.01
-    #   lr_decay_milestones: "60,90"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_pruning:
-    #   epochs: 80
-    #   lr: 0.01
-    #   lr_decay_milestones: "35,55"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
-    # after_metanetwork:
-    #   epochs: 80
-    #   lr: 0.01
-    #   lr_decay_milestones: "35,55"
-    #   lr_decay_gamma: 0.1
-    #   weight_decay: 0.0005
     after_pruning:
-      epochs: 60
+      epochs: 140
       lr: 0.01
-      lr_decay_milestones: "35,55"
+      lr_decay_milestones: "80,120"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
+    # after_pruning:
+    #   epochs: 100
+    #   lr: 0.01
+    #   lr_decay_milestones: "60,90"
+    #   lr_decay_gamma: 0.1
+    #   weight_decay: 0.0005
     after_metanetwork:
-      epochs: 60
+      epochs: 100
       lr: 0.01
-      lr_decay_milestones: "35,55"
+      lr_decay_milestones: "60,90"
       lr_decay_gamma: 0.1
       weight_decay: 0.0005
+    # after_pruning:
+    #   epochs: 80
+    #   lr: 0.01
+    #   lr_decay_milestones: "35,55"
+    #   lr_decay_gamma: 0.1
+    #   weight_decay: 0.0005
+    # after_metanetwork:
+    #   epochs: 80
+    #   lr: 0.01
+    #   lr_decay_milestones: "35,55"
+    #   lr_decay_gamma: 0.1
+    #   weight_decay: 0.0005
+    # after_pruning:
+    #   epochs: 60
+    #   lr: 0.01
+    #   lr_decay_milestones: "35,55"
+    #   lr_decay_gamma: 0.1
+    #   weight_decay: 0.0005
+    # after_metanetwork:
+    #   epochs: 60
+    #   lr: 0.01
+    #   lr_decay_milestones: "35,55"
+    #   lr_decay_gamma: 0.1
+    #   weight_decay: 0.0005
+    # after_pruning:
+    #   epochs: 1
+    #   lr: 0.01
+    #   lr_decay_milestones: "60,90"
+    #   lr_decay_gamma: 0.1
+    #   weight_decay: 0.0005
+    # after_metanetwork:
+    #   epochs: 1
+    #   lr: 0.01
+    #   lr_decay_milestones: "60,90"
+    #   lr_decay_gamma: 0.1
+    #   weight_decay: 0.0005
 
 
 

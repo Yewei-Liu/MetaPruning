@@ -246,6 +246,45 @@ def load_data(traindir, valdir, cfg):
         if cfg.cache_dataset:
             utils.mkdir(os.path.dirname(cache_path))
             utils.save_on_master((dataset, traindir), cache_path)
+        
+    # >>>>>>>>>>>>>>> NEW: make a class-balanced subset of train data <<<<<<<<<<<<<<<
+    if hasattr(cfg, "subset_ratio") and cfg.subset_ratio < 1.0:
+        from collections import defaultdict
+        import math
+        import random
+
+        ratio = cfg.subset_ratio
+        seed = getattr(cfg, "subset_seed", 42)
+        print(f"Using subset_ratio={ratio}, subset_seed={seed}")
+        random.seed(seed)
+
+        # dataset.targets exists for ImageFolder in recent torchvision
+        targets = dataset.targets if hasattr(dataset, "targets") else [s[1] for s in dataset.samples]
+
+        indices_per_class = defaultdict(list)
+        for idx, target in enumerate(targets):
+            indices_per_class[target].append(idx)
+
+        subset_indices = []
+        for cls, idxs in indices_per_class.items():
+            n_total = len(idxs)
+            n_keep = max(1, int(math.floor(n_total * ratio)))
+            random.shuffle(idxs)
+            chosen = idxs[:n_keep]
+            subset_indices.extend(chosen)
+            print(f"Class {cls}: keep {n_keep}/{n_total}")
+
+        subset_indices.sort()
+        subset = torch.utils.data.Subset(dataset, subset_indices)
+
+        # Attach attributes so the rest of your code still works
+        subset.classes = dataset.classes
+        subset.class_to_idx = dataset.class_to_idx
+        subset.targets = [targets[i] for i in subset_indices]
+
+        dataset = subset
+        print(f"Total subset size: {len(dataset)}")
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     print("Loading validation data...")
     cache_path = _get_cache_path(valdir)
@@ -784,7 +823,9 @@ def main(cfg: DictConfig) -> None:
         origin_model = state_dict_to_model(model_name, origin_state_dict, device)
 
         if cfg.resume_epoch == -1:
-            metanetwork = torch.load(os.path.join('save', f'{cfg.name}', 'meta_train', 'metanetwork', f"epoch_{cfg.metanetwork_index}.pth"), weights_only=False, map_location=device)['model']
+            metanetwork = torch.load(os.path.join('save', f'{cfg.name}', 'meta_train', 'metanetwork', f"epoch_{cfg.metanetwork_index}.pth"), weights_only=False, map_location=device)
+            if isinstance(metanetwork, dict):
+                metanetwork = metanetwork['model']
             print(f'load metanetwork from {os.path.join("save", f"{cfg.name}", "meta_train", "metanetwork", f"epoch_{cfg.metanetwork_index}.pth")}')
             node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, origin_state_dict, device)
             node_pred, edge_pred = metanetwork.forward(node_features, edge_index, edge_features_list)
