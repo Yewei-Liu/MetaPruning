@@ -15,7 +15,20 @@ from utils.train import train, eval
 from utils.visualize import visualize_acc_speed_up_curve, visualize_acc_pruned_params_curve
 from utils.meta_train import meta_train, meta_eval
 from utils.seed import set_seed
-from utils.analyse import analyze_models, plot_activation_and_grad, plot_bn_stats, plot_conv_weight_norms, plot_global_taylor_and_ratio, heatmap_metric, scatter_corr_vs_norm, plot_conv_norms_by_layer, plot_conv_norm_ratio
+from utils.analyse import (
+    analyze_models, 
+    plot_activation_and_grad, 
+    plot_bn_stats, plot_conv_weight_norms, 
+    plot_global_taylor_and_ratio, heatmap_metric, 
+    scatter_corr_vs_norm, 
+    plot_conv_norms_by_layer, 
+    plot_conv_norm_ratio,
+    compare_models_layer_hist,
+    plot_inter_channel_corr_by_layer,
+    plot_effective_rank_by_layer,
+    compare_taylor_sensitivity_hist,
+    plot_taylor_sensitivity_by_layer
+    )
 from data_loaders.get_dataset_model import get_dataset_model_loader
 from data_loaders.get_dataset import get_dataset_loader
 
@@ -208,10 +221,51 @@ def main(cfg):
         res = analyze_models(model_list, big_test_loader, device, num_batches=10, bn_gamma_zero_threshold=0.001, entropy_bins=40)
         print(res)
         os.makedirs(os.path.join(cfg.analyse.save_path, index_list_name), exist_ok=True)
-        plot_conv_norms_by_layer(res, [0, 1], 'weight_l2', os.path.join(cfg.analyse.save_path, index_list_name))
-        plot_conv_norms_by_layer(res, [0, 1], 'weight_l1', os.path.join(cfg.analyse.save_path, index_list_name))
-        plot_conv_norm_ratio(res, 1, 0, 'weight_l2', os.path.join(cfg.analyse.save_path, index_list_name))
-        plot_conv_norm_ratio(res, 1, 0, 'weight_l1', os.path.join(cfg.analyse.save_path, index_list_name))
+        # plot_conv_norms_by_layer(res, [0, 1], 'weight_l2', os.path.join(cfg.analyse.save_path, index_list_name))
+        # plot_conv_norms_by_layer(res, [0, 1], 'weight_l1', os.path.join(cfg.analyse.save_path, index_list_name))
+        # plot_conv_norm_ratio(res, 1, 0, 'weight_l2', os.path.join(cfg.analyse.save_path, index_list_name))
+        # plot_conv_norm_ratio(res, 1, 0, 'weight_l1', os.path.join(cfg.analyse.save_path, index_list_name))
+        
+        # compare_models_layer_hist(
+        #     model_list,
+        #     0,
+        #     1,
+        #     os.path.join(cfg.analyse.save_path, index_list_name, "norm"),
+        #     "conv",
+        #     bins=20,
+        #     xlim=(0.0, 1.0)
+        # )
+        
+        # plot_inter_channel_corr_by_layer(
+        #     res,
+        #     [0, 1],
+        #     save_path=os.path.join(cfg.analyse.save_path, index_list_name, "corr")
+        # )
+        
+        # plot_effective_rank_by_layer(
+        #     res,
+        #     [0, 1],
+        #     save_path=os.path.join(cfg.analyse.save_path, index_list_name, "erank")
+        # )
+        
+        compare_taylor_sensitivity_hist(
+            model_list,
+            0,
+            1,
+            os.path.join(cfg.analyse.save_path, index_list_name, "taylor_sensitivity"),
+            big_test_loader,
+            device,
+            num_batches=10,
+            layer_kinds="conv",
+            bins=40,
+            xlim=(0.0, 0.004)
+        )
+        
+        # plot_taylor_sensitivity_by_layer(
+        #     res,
+        #     [0,1],
+        #     save_path=os.path.join(cfg.analyse.save_path, index_list_name, "taylor_sensitivity_line_chart")
+        # )
 
     elif run == 'pruning_one_step':
         save_dir = cfg.meta_train.save_path

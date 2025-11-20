@@ -149,7 +149,7 @@ python main.py task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer run=
 ### Moreover
 Analyse statistics (l1 norm, l2 norm, correlation, etc.)
 ```bash
-python main.py task=resnet56_on_CIFAR10 method=group_l2_norm_max_normalizer name=Test run=analyse index=50
+python main.py task=resnet56_on_CIFAR10_no_init_pruning method=group_l2_norm_max_normalizer name=Test run=analyse index=50
 ```
 
 Unstructured pruning

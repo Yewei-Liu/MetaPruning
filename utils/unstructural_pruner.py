@@ -207,18 +207,18 @@ class NMSparsityPrune(BasePruneMethod):
 
             # Linear: weight shape (out_features, in_features)
             if isinstance(m, nn.Linear):
-                mask = nm_mask(W, self.N, self.M, self.dim).to(W.device)
+                mask = nm_mask(W, N, M, self.dim).to(W.device)
 
             # Conv2d: weight shape (out_c, in_c, kH, kW)
             elif isinstance(m, nn.Conv2d):
                 out_c = W.size(0)
                 W_flat = W.view(out_c, -1)  # flatten per-filter
-                mask_flat = nm_mask(W_flat, self.N, self.M, dim=1).to(W.device)
+                mask_flat = nm_mask(W_flat, N, M, dim=1).to(W.device)
                 mask = mask_flat.view_as(W)
 
             else:
                 # Fallback: group along last dim
-                mask = nm_mask(W, self.N, self.M, dim=-1).to(W.device)
+                mask = nm_mask(W, N, M, dim=-1).to(W.device)
 
             # If already pruned, combine new mask with existing one
             if hasattr(m, "weight_mask"):
