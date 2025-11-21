@@ -7,19 +7,17 @@ import torch.nn as nn
 import torch.utils.data
 from torchvision.datasets import VOCDetection
 import torchvision.transforms.functional as F
-
-from torchvision.models.detection import (
-    FasterRCNN,
-    fasterrcnn_resnet50_fpn,
-)
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from torchvision.models import resnet50
+from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.rpn import AnchorGenerator
 import torchvision.ops as ops
 import argparse
-
+import torch.nn.utils.prune as prune
+from utils.pruning import progressive_pruning
+from utils.convert import state_dict_to_graph, graph_to_state_dict, state_dict_to_model
 
 # -----------------------------
-# 1. Pascal VOC Dataset Wrapper
+# 0. Pascal VOC Classes
 # -----------------------------
 
 VOC_CLASSES = (
@@ -31,10 +29,14 @@ VOC_CLASSES = (
 )
 
 
+# -----------------------------
+# 1. Pascal VOC Dataset Wrapper
+# -----------------------------
+
 class VOCDataset(torch.utils.data.Dataset):
     """
-    Wrap torchvision.datasets.VOCDetection to return samples in the format
-    expected by torchvision detection models (Faster R-CNN, etc.).
+    Same as in your training script: wraps VOCDetection and outputs
+    samples in the format expected by torchvision detection models.
     """
 
     def __init__(
@@ -81,7 +83,7 @@ class VOCDataset(torch.utils.data.Dataset):
             ymax = float(bbox["ymax"])
 
             boxes.append([xmin, ymin, xmax, ymax])
-            labels.append(VOC_CLASSES.index(name) + 1)  # 1-based labels
+            labels.append(VOC_CLASSES.index(name) + 1)
             areas.append((xmax - xmin) * (ymax - ymin))
             iscrowd.append(0)
 
@@ -117,7 +119,6 @@ class VOCDataset(torch.utils.data.Dataset):
 # -----------------------------
 
 class Compose:
-    """Compose transforms that operate on (image, target)."""
     def __init__(self, transforms):
         self.transforms = transforms
 
@@ -129,13 +130,11 @@ class Compose:
 
 class ToTensor:
     def __call__(self, image, target):
-        # Convert PIL image to tensor [C,H,W] in [0,1]
         image = F.to_tensor(image)
         return image, target
 
 
 class RandomHorizontalFlip:
-    """Horizontal flip for both image and bounding boxes."""
     def __init__(self, p=0.5):
         self.p = p
 
@@ -153,15 +152,24 @@ class RandomHorizontalFlip:
         return image, target
 
 
+class Normalize:
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, image, target):
+        image = F.normalize(image, mean=self.mean, std=self.std)
+        return image, target
+
+
 def get_transform(train: bool = True):
-    """
-    For torchvision detection models (like fasterrcnn_resnet50_fpn),
-    we pass images as tensors in [0,1] and let the internal transform
-    handle normalization and resizing.
-    """
+    imagenet_mean = [0.485, 0.456, 0.406]
+    imagenet_std = [0.229, 0.224, 0.225]
+
     transforms = [ToTensor()]
     if train:
         transforms.append(RandomHorizontalFlip(0.5))
+    transforms.append(Normalize(imagenet_mean, imagenet_std))
     return Compose(transforms)
 
 
@@ -170,34 +178,36 @@ def collate_fn(batch):
 
 
 # -----------------------------
-# 3. Build Faster R-CNN model
+# 3. Faster R-CNN model
 # -----------------------------
 
 def get_faster_rcnn_resnet50(num_classes: int) -> FasterRCNN:
-    """
-    Use torchvision's fasterrcnn_resnet50_fpn COCO-pretrained model
-    and replace the box predictor head to match VOC classes.
-    """
-    # Load COCO-pretrained detector
-    # For newer torchvision versions:
-    model = fasterrcnn_resnet50_fpn(weights="DEFAULT")
-    # If you're on an older torchvision, you might need:
-    # model = fasterrcnn_resnet50_fpn(pretrained=True)
+    backbone = resnet50(pretrained=True)
+    backbone = nn.Sequential(*list(backbone.children())[:-2])
+    backbone.out_channels = 2048
 
-    # Replace the ROI head predictor to match num_classes (VOC: 21 including background)
-    in_features = model.roi_heads.box_predictor.cls_score.in_features
-    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    anchor_generator = AnchorGenerator(
+        sizes=((32, 64, 128, 256, 512),),
+        aspect_ratios=((0.5, 1.0, 2.0),),
+    )
+
+    roi_pooler = ops.MultiScaleRoIAlign(
+        featmap_names=["0"],
+        output_size=7,
+        sampling_ratio=2,
+    )
+
+    model = FasterRCNN(
+        backbone=backbone,
+        num_classes=num_classes,
+        rpn_anchor_generator=anchor_generator,
+        box_roi_pool=roi_pooler,
+    )
 
     return model
 
 
-def freeze_backbone_bn(model: FasterRCNN):
-    """
-    Optionally freeze BatchNorm in the backbone.
-    With fasterrcnn_resnet50_fpn, the backbone lives in model.backbone.body.
-    """
-    backbone = model.backbone
-    # backbone.body is the ResNet-50 trunk
+def freeze_backbone_bn(backbone: nn.Module):
     for m in backbone.modules():
         if isinstance(m, nn.BatchNorm2d):
             m.eval()
@@ -206,11 +216,10 @@ def freeze_backbone_bn(model: FasterRCNN):
 
 
 # -----------------------------
-# 4. mAP evaluation (VOC07)
+# 4. VOC mAP evaluation
 # -----------------------------
 
 def voc_ap(rec, prec, use_07_metric=True):
-    """Compute AP using the VOC07 11-point metric (default) or the continuous metric."""
     if use_07_metric:
         ap = 0.0
         for t in np.arange(0., 1.1, 0.1):
@@ -221,7 +230,6 @@ def voc_ap(rec, prec, use_07_metric=True):
             ap += p / 11.
         return ap
 
-    # Continuous metric (VOC10+)
     mrec = np.concatenate(([0.], rec, [1.]))
     mpre = np.concatenate(([0.], prec, [0.]))
 
@@ -234,7 +242,6 @@ def voc_ap(rec, prec, use_07_metric=True):
 
 
 def compute_iou(box, boxes):
-    """Compute IoU between a single box and multiple boxes."""
     if boxes.size == 0:
         return np.array([])
 
@@ -265,13 +272,8 @@ def evaluate_map_voc(
     use_07_metric: bool = True,
     score_thresh: float = 0.05,
 ):
-    """
-    Evaluate VOC-style mAP@IoU=0.5 (VOC07 11-point by default)
-    on the given data_loader.
-    """
     model.eval()
 
-    # Collect detections and annotations per class
     all_detections = {cls: [] for cls in VOC_CLASSES}
     all_annotations = {cls: {} for cls in VOC_CLASSES}
     npos_per_class = {cls: 0 for cls in VOC_CLASSES}
@@ -283,7 +285,6 @@ def evaluate_map_voc(
         for out, t in zip(outputs, targets):
             image_id = int(t["image_id"].item())
 
-            # GT
             gt_boxes = t["boxes"].cpu().numpy()
             gt_labels = t["labels"].cpu().numpy()
 
@@ -294,12 +295,10 @@ def evaluate_map_voc(
                 all_annotations[cls_name][image_id].append(box)
                 npos_per_class[cls_name] += 1
 
-            # Detections
             det_boxes = out["boxes"].cpu().numpy()
             det_scores = out["scores"].cpu().numpy()
             det_labels = out["labels"].cpu().numpy()
 
-            # Filter low-confidence detections
             keep = det_scores >= score_thresh
             det_boxes = det_boxes[keep]
             det_scores = det_scores[keep]
@@ -326,12 +325,12 @@ def evaluate_map_voc(
             print(f"{cls_name:>12}: no ground truth, AP = 0.0000")
             continue
 
-        # Convert annotations to arrays and detection flags
         for img_id in annotations:
             annotations[img_id] = np.array(annotations[img_id])
-        img_detected = {img_id: np.zeros(len(boxes)) for img_id, boxes in annotations.items()}
+        img_detected = {
+            img_id: np.zeros(len(boxes)) for img_id, boxes in annotations.items()
+        }
 
-        # Sort detections by score
         if len(detections) == 0:
             aps.append(0.0)
             print(f"{cls_name:>12}: no detections, AP = 0.0000")
@@ -374,7 +373,7 @@ def evaluate_map_voc(
 
 
 # -----------------------------
-# 5. Training
+# 5. One-epoch training (reuse)
 # -----------------------------
 
 def train_one_epoch(
@@ -397,10 +396,6 @@ def train_one_epoch(
 
         optimizer.zero_grad()
         losses.backward()
-
-        # Optional: gradient clipping for stability
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
-
         optimizer.step()
 
         running_loss += losses.item()
@@ -414,36 +409,100 @@ def train_one_epoch(
             running_loss = 0.0
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Train Faster R-CNN ResNet50-FPN on VOC07 (for pruning experiments)")
-    parser.add_argument("--index", type=int, default=0)
-    args = parser.parse_args()
-    return args
+# -----------------------------
+# 6. Pruning utilities
+# -----------------------------
 
+def apply_global_unstructured_pruning(model: nn.Module, amount: float = 0.2):
+    """
+    Apply global L1 unstructured pruning over all Conv2d and Linear weights.
+    amount: fraction of weights to prune globally (0.0 - 1.0)
+    """
+    parameters_to_prune = []
+    for module in model.modules():
+        if isinstance(module, (nn.Conv2d, nn.Linear)):
+            parameters_to_prune.append((module, "weight"))
+
+    print(f"Pruning {len(parameters_to_prune)} parameter tensors globally with amount={amount}.")
+
+    prune.global_unstructured(
+        parameters_to_prune,
+        pruning_method=prune.L1Unstructured,
+        amount=amount,
+    )
+
+    # Optionally, remove reparametrization so that .weight is the pruned tensor
+    for module, name in parameters_to_prune:
+        prune.remove(module, name)
+
+    # Report overall sparsity
+    total_params = 0
+    total_zero = 0
+    for module in model.modules():
+        if isinstance(module, (nn.Conv2d, nn.Linear)):
+            w = module.weight.data
+            total_params += w.numel()
+            total_zero += (w == 0).sum().item()
+    print(f"Global sparsity: {100.0 * total_zero / total_params:.2f}% "
+          f"({total_zero}/{total_params} zeros)")
+
+
+# -----------------------------
+# 7. Argument parsing
+# -----------------------------
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Load best Faster R-CNN checkpoint, prune, and finetune on VOC07"
+    )
+    parser.add_argument("--index", type=int, default=1,
+                        help="index used in checkpoint path (same as training script)")
+    parser.add_argument("--speed_up", type=float, default=2.5,
+                        help="speed-up factor for pruning (e.g., 2.5 means 60% weights pruned)")
+    parser.add_argument("--finetune_epochs", type=int, default=50,
+                        help="number of finetuning epochs after pruning")
+    parser.add_argument("--lr", type=float, default=0.005,
+                        help="learning rate for finetuning (smaller than pretraining)")
+    parser.add_argument("--weight_decay", type=float, default=0.0005)
+    parser.add_argument("--momentum", type=float, default=0.9)
+    parser.add_argument("--batch_size", type=int, default=4)
+    parser.add_argument("--num_workers", type=int, default=4)
+    parser.add_argument("--eval_every", type=int, default=5)
+    parser.add_argument("--lr_decay_milestones", type=str, default="25,40",
+                        help="milestones (epochs) for MultiStepLR during finetune")
+    return parser.parse_args()
+
+
+# -----------------------------
+# 8. Main: load, prune, finetune
+# -----------------------------
 
 def main():
-    # Set this to the directory that CONTAINS VOCdevkit
     args = parse_args()
     index = str(args.index)
+
+    # Paths (match your training script structure)
     trainval_root = "../dataset/VOCtrainval_06-Nov-2007"
     test_root = "../dataset/VOCtest_06-Nov-2007"
 
-    ckpt_dir = f"checkpoints/{index}/pretrain"
-    os.makedirs(ckpt_dir, exist_ok=True)
+    pretrain_ckpt_dir = f"checkpoints/{index}/pretrain"
+    best_model_path = os.path.join(pretrain_ckpt_dir, "fasterrcnn_resnet50_voc07_best.pth")
+
+    if not os.path.exists(best_model_path):
+        raise FileNotFoundError(f"Best checkpoint not found: {best_model_path}")
+
+    after_metanetwork_dir = f"checkpoints/{index}/after_metanetwork"
+    pruned_dir = f"checkpoints/{index}/metanetwork_pruned_finetune"
+    os.makedirs(pruned_dir, exist_ok=True)
+    os.makedirs(after_metanetwork_dir, exist_ok=True)
 
     num_classes = 21  # 20 classes + background
-    num_epochs = 24   # typical for fine-tuning a strong pretrained detector
-    lr = 0.005        # slightly higher LR works well with batch_size=4
-    momentum = 0.9
-    weight_decay = 0.0005
-    batch_size = 4
-    num_workers = 4
-    lr_decay_milestones = "16,22"
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print("Using device:", device)
+    print("Loading best checkpoint from:", best_model_path)
 
-    # ------------- use train / val splits -------------
+    # Datasets & loaders
     dataset_train = VOCDataset(
         root=trainval_root,
         year="2007",
@@ -470,9 +529,9 @@ def main():
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train,
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         shuffle=True,
-        num_workers=num_workers,
+        num_workers=args.num_workers,
         collate_fn=collate_fn,
     )
 
@@ -480,7 +539,7 @@ def main():
         dataset_val,
         batch_size=1,
         shuffle=False,
-        num_workers=num_workers,
+        num_workers=args.num_workers,
         collate_fn=collate_fn,
     )
 
@@ -488,38 +547,58 @@ def main():
         dataset_test,
         batch_size=1,
         shuffle=False,
-        num_workers=num_workers,
+        num_workers=args.num_workers,
         collate_fn=collate_fn,
     )
 
     # Model
     model = get_faster_rcnn_resnet50(num_classes=num_classes)
+    state_dict = torch.load(best_model_path, map_location=device)
+    model.load_state_dict(state_dict)
     model.to(device)
+
+    # Optional: freeze BN (same as pretraining script)
+    freeze_backbone_bn(model.backbone)
+
+    # Evaluate before pruning
+    print("\nEvaluating best (unpruned) model on VOC07 val...")
+    evaluate_map_voc(model, data_loader_val, device)
     
-    body = model.backbone.body
-    print(body)
-    exit()
+    metanetwork = torch.load("metanetwork.pth", weights_only=False, map_location=device)
+    if isinstance(metanetwork, dict):
+        metanetwork = metanetwork['model']
+    print('load metanetwork from metanetwork.pth')
+    model_name = "resnet50_detection"
+    origin_state_dict = model.state_dict()
+    node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, origin_state_dict, device)
+    node_pred, edge_pred = metanetwork.forward(node_features, edge_index, edge_features_list)
+    state_dict = graph_to_state_dict(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
+    model = state_dict_to_model(model_name, state_dict, device)
 
-    # Optional: freeze BN in backbone to stabilize with small batches.
-    freeze_backbone_bn(model)
 
-    # Optimizer & LR scheduler
+    print("\nEvaluating after metanetwork on VOC07 val...")
+    evaluate_map_voc(model, data_loader_val, device)
+
+    # Finetuning setup
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(
         params,
-        lr=lr,
-        momentum=momentum,
-        weight_decay=weight_decay,
+        lr=args.lr,
+        momentum=args.momentum,
+        weight_decay=args.weight_decay,
     )
-    milestones = [int(ms) for ms in lr_decay_milestones.split(",")]
+    milestones = [int(ms) for ms in args.lr_decay_milestones.split(",")]
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optimizer, milestones=milestones, gamma=0.1
     )
 
     best_map = 0.0
-    best_model_path = os.path.join(ckpt_dir, "fasterrcnn_resnet50_fpn_voc07_best.pth")
+    best_model_path_pruned = os.path.join(
+        after_metanetwork_dir, f"fasterrcnn_resnet50_voc07_pruned_best.pth"
+    )
 
-    for epoch in range(1, num_epochs + 1):
+    # Finetuning loop
+    for epoch in range(1, args.finetune_epochs + 1):
         train_one_epoch(
             model,
             optimizer,
@@ -530,25 +609,83 @@ def main():
         )
         lr_scheduler.step()
 
-        print("\nEvaluating on VOC07 val...")
-        mAP, _ = evaluate_map_voc(model, data_loader_val, device)
+        if epoch % args.eval_every == 0:
+            print("\nEvaluating finetuned model on VOC07 val...")
+            mAP, _ = evaluate_map_voc(model, data_loader_val, device)
 
-        # Save best model based on val mAP
-        if mAP > best_map:
-            best_map = mAP
-            torch.save(model.state_dict(), best_model_path)
-            print(f"New best mAP = {best_map:.4f}. Saved: {best_model_path}")
+            if mAP > best_map:
+                best_map = mAP
+                torch.save(model.state_dict(), best_model_path_pruned)
+                print(f"New best pruned mAP = {best_map:.4f}. Saved: {best_model_path_pruned}")
 
-        # Also save per-epoch checkpoint
         ckpt_epoch_path = os.path.join(
-            ckpt_dir, f"fasterrcnn_resnet50_fpn_voc07_epoch{epoch}.pth"
+            after_metanetwork_dir, f"fasterrcnn_resnet50_voc07_pruned_epoch{epoch}.pth"
         )
         torch.save(model.state_dict(), ckpt_epoch_path)
-        print(f"Saved checkpoint: {ckpt_epoch_path}\n")
+        print(f"Saved finetuned checkpoint: {ckpt_epoch_path}\n")
 
-    print("\nEvaluating on VOC07 test...")
-    mAP, _ = evaluate_map_voc(model, data_loader_test, device)
+    # Final test evaluation
+    print("\nEvaluating final finetuned model on VOC07 test...")
+    evaluate_map_voc(model, data_loader_test, device)
 
+    # Apply pruning
+    print("\nApplying global structured pruning...")
+    speed_up, model = progressive_pruning(model, "IMAGENET", None, None, args.speed_up, "group_l2_norm_max_normalizer", False, device,
+                                          False, False, None, False)
+    print(f"Pruning completed. Speed up: {speed_up:.2f}")
+    
+    # Evaluate immediately after pruning (before finetune)
+    print("\nEvaluating pruned (not finetuned) model on VOC07 val...")
+    evaluate_map_voc(model, data_loader_val, device)
+
+    # Finetuning setup
+    params = [p for p in model.parameters() if p.requires_grad]
+    optimizer = torch.optim.SGD(
+        params,
+        lr=args.lr,
+        momentum=args.momentum,
+        weight_decay=args.weight_decay,
+    )
+    milestones = [int(ms) for ms in args.lr_decay_milestones.split(",")]
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        optimizer, milestones=milestones, gamma=0.1
+    )
+
+    best_map = 0.0
+    best_model_path_pruned = os.path.join(
+        pruned_dir, f"fasterrcnn_resnet50_voc07_pruned_best.pth"
+    )
+
+    # Finetuning loop
+    for epoch in range(1, args.finetune_epochs + 1):
+        train_one_epoch(
+            model,
+            optimizer,
+            data_loader_train,
+            device,
+            epoch,
+            print_freq=50,
+        )
+        lr_scheduler.step()
+
+        if epoch % args.eval_every == 0:
+            print("\nEvaluating pruned+finetuned model on VOC07 val...")
+            mAP, _ = evaluate_map_voc(model, data_loader_val, device)
+
+            if mAP > best_map:
+                best_map = mAP
+                torch.save(model.state_dict(), best_model_path_pruned)
+                print(f"New best pruned mAP = {best_map:.4f}. Saved: {best_model_path_pruned}")
+
+        ckpt_epoch_path = os.path.join(
+            pruned_dir, f"fasterrcnn_resnet50_voc07_pruned_epoch{epoch}.pth"
+        )
+        torch.save(model.state_dict(), ckpt_epoch_path)
+        print(f"Saved pruned+finetuned checkpoint: {ckpt_epoch_path}\n")
+
+    # Final test evaluation
+    print("\nEvaluating final finetuned model on VOC07 test...")
+    evaluate_map_voc(model, data_loader_test, device)
 
 if __name__ == "__main__":
     main()

@@ -446,12 +446,13 @@ def main():
 
     num_classes = 21  # 20 classes + background
     num_epochs = 50
-    lr = 0.01
+    lr = 0.005
     momentum = 0.9
     weight_decay = 0.0005
     batch_size = 4
-    num_workers = 4
+    num_workers = 16
     lr_decay_milestones = "25,40"
+    eval_every = 5
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print("Using device:", device)
@@ -539,15 +540,16 @@ def main():
             print_freq=50,
         )
         lr_scheduler.step()
+        
+        if epoch % eval_every == 0:
+            print("\nEvaluating on VOC07 val...")
+            mAP, _ = evaluate_map_voc(model, data_loader_val, device)
 
-        print("\nEvaluating on VOC07 val...")
-        mAP, _ = evaluate_map_voc(model, data_loader_val, device)
-
-        # Save best model based on val mAP
-        if mAP > best_map:
-            best_map = mAP
-            torch.save(model.state_dict(), best_model_path)
-            print(f"New best mAP = {best_map:.4f}. Saved: {best_model_path}")
+            # Save best model based on val mAP
+            if mAP > best_map:
+                best_map = mAP
+                torch.save(model.state_dict(), best_model_path)
+                print(f"New best mAP = {best_map:.4f}. Saved: {best_model_path}")
 
         # Also save per-epoch checkpoint
         ckpt_epoch_path = os.path.join(
