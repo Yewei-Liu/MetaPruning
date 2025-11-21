@@ -7,8 +7,12 @@ import torch.nn as nn
 import torch.utils.data
 from torchvision.datasets import VOCDetection
 import torchvision.transforms.functional as F
-from torchvision.models import resnet50
-from torchvision.models.detection import FasterRCNN
+
+from torchvision.models.detection import (
+    FasterRCNN,
+    fasterrcnn_resnet50_fpn,
+)
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.rpn import AnchorGenerator
 import torchvision.ops as ops
 import argparse
@@ -77,7 +81,7 @@ class VOCDataset(torch.utils.data.Dataset):
             ymax = float(bbox["ymax"])
 
             boxes.append([xmin, ymin, xmax, ymax])
-            labels.append(VOC_CLASSES.index(name) + 1)
+            labels.append(VOC_CLASSES.index(name) + 1)  # 1-based labels
             areas.append((xmax - xmin) * (ymax - ymin))
             iscrowd.append(0)
 
@@ -125,7 +129,8 @@ class Compose:
 
 class ToTensor:
     def __call__(self, image, target):
-        image = F.to_tensor(image)  # [C,H,W], values in [0,1]
+        # Convert PIL image to tensor [C,H,W] in [0,1]
+        image = F.to_tensor(image)
         return image, target
 
 
@@ -148,26 +153,15 @@ class RandomHorizontalFlip:
         return image, target
 
 
-class Normalize:
-    """Normalize image with ImageNet mean/std (for ResNet-50 pretrained)."""
-    def __init__(self, mean, std):
-        self.mean = mean
-        self.std = std
-
-    def __call__(self, image, target):
-        image = F.normalize(image, mean=self.mean, std=self.std)
-        return image, target
-
-
 def get_transform(train: bool = True):
-    # ImageNet normalization parameters (for ResNet-50 pretrained backbone)
-    imagenet_mean = [0.485, 0.456, 0.406]
-    imagenet_std = [0.229, 0.224, 0.225]
-
+    """
+    For torchvision detection models (like fasterrcnn_resnet50_fpn),
+    we pass images as tensors in [0,1] and let the internal transform
+    handle normalization and resizing.
+    """
     transforms = [ToTensor()]
     if train:
         transforms.append(RandomHorizontalFlip(0.5))
-    transforms.append(Normalize(imagenet_mean, imagenet_std))
     return Compose(transforms)
 
 
@@ -180,41 +174,30 @@ def collate_fn(batch):
 # -----------------------------
 
 def get_faster_rcnn_resnet50(num_classes: int) -> FasterRCNN:
-    # ResNet-50 backbone pretrained for classification
-    backbone = resnet50(pretrained=True)
+    """
+    Use torchvision's fasterrcnn_resnet50_fpn COCO-pretrained model
+    and replace the box predictor head to match VOC classes.
+    """
+    # Load COCO-pretrained detector
+    # For newer torchvision versions:
+    model = fasterrcnn_resnet50_fpn(weights="DEFAULT")
+    # If you're on an older torchvision, you might need:
+    # model = fasterrcnn_resnet50_fpn(pretrained=True)
 
-    # Remove avgpool + fc, keep conv layers only
-    backbone = nn.Sequential(*list(backbone.children())[:-2])
-    backbone.out_channels = 2048  # last conv feature depth
-
-    # RPN anchor generator
-    anchor_generator = AnchorGenerator(
-        sizes=((32, 64, 128, 256, 512),),
-        aspect_ratios=((0.5, 1.0, 2.0),),
-    )
-
-    # Only one feature map from the backbone, so featmap_names=["0"]
-    roi_pooler = ops.MultiScaleRoIAlign(
-        featmap_names=["0"],
-        output_size=7,
-        sampling_ratio=2,
-    )
-
-    model = FasterRCNN(
-        backbone=backbone,
-        num_classes=num_classes,
-        rpn_anchor_generator=anchor_generator,
-        box_roi_pool=roi_pooler,
-    )
+    # Replace the ROI head predictor to match num_classes (VOC: 21 including background)
+    in_features = model.roi_heads.box_predictor.cls_score.in_features
+    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
     return model
 
 
-def freeze_backbone_bn(backbone: nn.Module):
+def freeze_backbone_bn(model: FasterRCNN):
     """
     Optionally freeze BatchNorm in the backbone.
-    For pruning research you might disable this if you want everything trainable.
+    With fasterrcnn_resnet50_fpn, the backbone lives in model.backbone.body.
     """
+    backbone = model.backbone
+    # backbone.body is the ResNet-50 trunk
     for m in backbone.modules():
         if isinstance(m, nn.BatchNorm2d):
             m.eval()
@@ -414,6 +397,10 @@ def train_one_epoch(
 
         optimizer.zero_grad()
         losses.backward()
+
+        # Optional: gradient clipping for stability
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+
         optimizer.step()
 
         running_loss += losses.item()
@@ -428,7 +415,7 @@ def train_one_epoch(
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Prune and finetune Faster R-CNN ResNet50 on VOC07")
+    parser = argparse.ArgumentParser(description="Train Faster R-CNN ResNet50-FPN on VOC07 (for pruning experiments)")
     parser.add_argument("--index", type=int, default=0)
     args = parser.parse_args()
     return args
@@ -445,13 +432,13 @@ def main():
     os.makedirs(ckpt_dir, exist_ok=True)
 
     num_classes = 21  # 20 classes + background
-    num_epochs = 50
-    lr = 0.01
+    num_epochs = 24   # typical for fine-tuning a strong pretrained detector
+    lr = 0.005        # slightly higher LR works well with batch_size=4
     momentum = 0.9
     weight_decay = 0.0005
     batch_size = 4
     num_workers = 4
-    lr_decay_milestones = "25,40"
+    lr_decay_milestones = "16,22"
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print("Using device:", device)
@@ -508,10 +495,13 @@ def main():
     # Model
     model = get_faster_rcnn_resnet50(num_classes=num_classes)
     model.to(device)
+    
+    body = model.backbone.body
+    print(body)
+    exit()
 
     # Optional: freeze BN in backbone to stabilize with small batches.
-    # For pruning experiments, you can comment this out if you need BN trainable.
-    freeze_backbone_bn(model.backbone)
+    freeze_backbone_bn(model)
 
     # Optimizer & LR scheduler
     params = [p for p in model.parameters() if p.requires_grad]
@@ -527,7 +517,7 @@ def main():
     )
 
     best_map = 0.0
-    best_model_path = os.path.join(ckpt_dir, "fasterrcnn_resnet50_voc07_best.pth")
+    best_model_path = os.path.join(ckpt_dir, "fasterrcnn_resnet50_fpn_voc07_best.pth")
 
     for epoch in range(1, num_epochs + 1):
         train_one_epoch(
@@ -551,7 +541,7 @@ def main():
 
         # Also save per-epoch checkpoint
         ckpt_epoch_path = os.path.join(
-            ckpt_dir, f"fasterrcnn_resnet50_voc07_epoch{epoch}.pth"
+            ckpt_dir, f"fasterrcnn_resnet50_fpn_voc07_epoch{epoch}.pth"
         )
         torch.save(model.state_dict(), ckpt_epoch_path)
         print(f"Saved checkpoint: {ckpt_epoch_path}\n")

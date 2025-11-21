@@ -1,74 +1,126 @@
 import os
 import argparse
-from typing import Tuple, Dict
-
-import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.utils.data
 import torch.nn.utils.prune as prune
 
-from torchvision.datasets import VOCDetection
-import torchvision.transforms as T
-from torchvision.models import resnet50
-from torchvision.models.detection import FasterRCNN
-from torchvision.models.detection.rpn import AnchorGenerator
-import torchvision.ops as ops
-from other.voc_frcnn import evaluate_map_voc, train_one_epoch, collate_fn, get_faster_rcnn_resnet50, VOCDataset, get_transform
-from utils.convert import state_dict_to_model, state_dict_to_graph, graph_to_model
+# ==============================
+# Import all stuff from your file
+# ==============================
+# !!! IMPORTANT !!!
+# Replace `your_training_script` with the filename that contains
+# VOCDataset, get_transform, collate_fn, get_faster_rcnn_resnet50,
+# freeze_backbone_bn, evaluate_map_voc, train_one_epoch, VOC_CLASSES.
+#
+# Example: if your original file is called `train_voc_frcnn.py`, then:
+# from train_voc_frcnn import ...
+from voc_frcnn import (
+    VOCDataset,
+    get_transform,
+    collate_fn,
+    get_faster_rcnn_resnet50,
+    freeze_backbone_bn,
+    evaluate_map_voc,
+    train_one_epoch,
+    VOC_CLASSES,
+)
 
 
+# =========================
+# 1. Pruning helper function
+# =========================
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Prune and finetune Faster R-CNN ResNet50 on VOC07")
+def apply_global_conv_pruning(model: nn.Module, amount: float = 0.3):
+    """
+    Globally prune Conv2d weights in the whole model using L1 unstructured pruning.
 
-    parser.add_argument("--trainval-root", type=str, default="../dataset/VOCtrainval_06-Nov-2007",
-                        help="Path to VOC trainval root (folder containing VOCdevkit)")
-    parser.add_argument("--test-root", type=str, default="../dataset/VOCtest_06-Nov-2007",
-                        help="Path to VOC test root")
+    amount:
+        fraction of parameters to prune globally (e.g., 0.3 = 30%)
+    """
+    parameters_to_prune = []
 
-    parser.add_argument("--ckpt-path", type=str, default="checkpoints/pretrain/fasterrcnn_resnet50_voc07_best.pth",
-                        help="Path to the best pretrained checkpoint to load")
+    for module_name, module in model.named_modules():
+        if isinstance(module, nn.Conv2d):
+            parameters_to_prune.append((module, "weight"))
 
-    parser.add_argument("--output-dir", type=str, default="checkpoints/pruned",
-                        help="Directory to save pruned/finetuned checkpoints")
+    print(f"[Pruning] Number of Conv2d layers to prune: {len(parameters_to_prune)}")
+    if len(parameters_to_prune) == 0:
+        print("[Pruning] WARNING: no Conv2d modules found to prune.")
+        return model
 
-    parser.add_argument("--prune-amount", type=float, default=0.3,
-                        help="Fraction of Conv/Linear weights to globally prune (0.0 ~ 1.0)")
-    parser.add_argument("--finetune-epochs", type=int, default=5,
-                        help="Number of finetuning epochs after pruning")
-    parser.add_argument("--batch-size", type=int, default=4,
-                        help="Training batch size")
-    parser.add_argument("--num-workers", type=int, default=4,
-                        help="Number of dataloader workers")
+    prune.global_unstructured(
+        parameters_to_prune,
+        pruning_method=prune.L1Unstructured,
+        amount=amount,
+    )
 
-    parser.add_argument("--lr", type=float, default=0.001,
-                        help="Learning rate for finetuning (smaller than initial training)")
-    parser.add_argument("--momentum", type=float, default=0.9,
-                        help="SGD momentum")
-    parser.add_argument("--weight-decay", type=float, default=0.0005,
-                        help="Weight decay")
+    # Make pruning permanent (remove the pruning re-parametrization, keep zeros)
+    for m, _ in parameters_to_prune:
+        try:
+            prune.remove(m, "weight")
+        except ValueError:
+            # already removed / not pruned
+            pass
 
-    parser.add_argument("--eval-interval", type=int, default=1,
-                        help="Evaluate mAP on val every N epochs")
-
-    args = parser.parse_args()
-    return args
+    print(f"[Pruning] Global L1 unstructured pruning applied with amount={amount}.")
+    return model
 
 
-def main():
-    args = parse_args()
+# ============================
+# 2. Prune + finetune + test
+# ============================
 
-    os.makedirs(args.output_dir, exist_ok=True)
+def prune_and_finetune(
+    index: int = 0,
+    prune_amount: float = 0.3,
+    finetune_epochs: int = 20,
+    lr: float = 1e-4,
+    momentum: float = 0.9,
+    weight_decay: float = 5e-4,
+    batch_size: int = 4,
+    num_workers: int = 4,
+):
+    """
+    1) Load best pre-trained checkpoint.
+    2) Apply pruning.
+    3) Finetune on train split, picking best on val split.
+    4) Evaluate best pruned model on test split.
+    """
 
-    num_classes = 21  # 20 classes + background
+    index = str(index)
+
+    # Same dataset roots as in your original training script
+    trainval_root = "../dataset/VOCtrainval_06-Nov-2007"
+    test_root = "../dataset/VOCtest_06-Nov-2007"
+
+    # ---------- Checkpoint paths ----------
+
+    pretrain_ckpt_dir = f"checkpoints/{index}/pretrain"
+    pretrain_best_ckpt = os.path.join(
+        pretrain_ckpt_dir, "fasterrcnn_resnet50_voc07_best.pth"
+    )
+
+    if not os.path.isfile(pretrain_best_ckpt):
+        raise FileNotFoundError(
+            f"Cannot find pretrain checkpoint: {pretrain_best_ckpt}\n"
+            "Make sure you ran your original training script first."
+        )
+
+    pruned_ckpt_dir = f"checkpoints/{index}/pruned"
+    os.makedirs(pruned_ckpt_dir, exist_ok=True)
+    pruned_best_ckpt = os.path.join(
+        pruned_ckpt_dir, "fasterrcnn_resnet50_voc07_pruned_best.pth"
+    )
+
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print("Using device:", device)
 
-    # Datasets & DataLoaders
+    # ---------- Datasets and loaders ----------
+
     dataset_train = VOCDataset(
-        root=args.trainval_root,
+        root=trainval_root,
         year="2007",
         image_set="train",
         transforms=get_transform(train=True),
@@ -76,18 +128,26 @@ def main():
     )
 
     dataset_val = VOCDataset(
-        root=args.trainval_root,
+        root=trainval_root,
         year="2007",
         image_set="val",
         transforms=get_transform(train=False),
         download=False,
     )
 
+    dataset_test = VOCDataset(
+        root=test_root,
+        year="2007",
+        image_set="test",
+        transforms=get_transform(train=False),
+        download=False,
+    )
+
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train,
-        batch_size=args.batch_size,
+        batch_size=batch_size,
         shuffle=True,
-        num_workers=args.num_workers,
+        num_workers=num_workers,
         collate_fn=collate_fn,
     )
 
@@ -95,56 +155,61 @@ def main():
         dataset_val,
         batch_size=1,
         shuffle=False,
-        num_workers=args.num_workers,
+        num_workers=num_workers,
         collate_fn=collate_fn,
     )
 
-    # Build model and load checkpoint
-    print(f"Building model and loading checkpoint from: {args.ckpt_path}")
+    data_loader_test = torch.utils.data.DataLoader(
+        dataset_test,
+        batch_size=1,
+        shuffle=False,
+        num_workers=num_workers,
+        collate_fn=collate_fn,
+    )
+
+    # ---------- Build model & load pretrained weights ----------
+
+    num_classes = len(VOC_CLASSES) + 1  # 20 + background
     model = get_faster_rcnn_resnet50(num_classes=num_classes)
-    checkpoint = torch.load(args.ckpt_path, map_location="cpu")
-    model.load_state_dict(checkpoint)
+
+    print(f"Loading pretrain checkpoint from: {pretrain_best_ckpt}")
+    state_dict = torch.load(pretrain_best_ckpt, map_location="cpu")
+    model.load_state_dict(state_dict)
+
+    # Freeze BN in backbone (same as your original script)
+    freeze_backbone_bn(model.backbone)
+
+    # ---------- Apply pruning ----------
+
+    model = apply_global_conv_pruning(model, amount=prune_amount)
     model.to(device)
 
-    # Evaluate before pruning (optional but useful)
-    print("\nEvaluating baseline (before pruning) on VOC07 val...")
-    baseline_map, _ = evaluate_map_voc(model, data_loader_val, device)
-    print(f"Baseline mAP@0.5 (val) = {baseline_map:.4f}")
+    # ---------- Finetune settings ----------
 
-    metanetwork = torch.load(metanetwork.pth, weights_only=False)
-    if isinstance(metanetwork, list):
-        metanetwork = metanetwork["model"]
-    metanetwork.eval().to(device)
-    origin_state_dict = model.state_dict()
-    model_name = "resnet50_detection"
-    node_index, node_features, edge_index, edge_features = state_dict_to_graph(model_name, origin_state_dict)
-    node_pred, edge_pred = metanetwork.forward(node_features.to(device), edge_index.to(device), edge_features.to(device))
-    model = graph_to_model(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred)
-
-    # Evaluate immediately after pruning (without finetuning)
-    print("\nEvaluating pruned (before finetuning) on VOC07 val...")
-    pruned_map, _ = evaluate_map_voc(model, data_loader_val, device)
-    print(f"Pruned mAP@0.5 (val) before finetune = {pruned_map:.4f}")
-
-    # Finetune pruned model
-    print("\nStarting finetuning on pruned model...")
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(
         params,
-        lr=args.lr,
-        momentum=args.momentum,
-        weight_decay=args.weight_decay,
-    )
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer,
-        step_size=3,
-        gamma=0.1,
+        lr=lr,
+        momentum=momentum,
+        weight_decay=weight_decay,
     )
 
-    best_finetune_map = 0.0
-    best_finetune_path = os.path.join(args.output_dir, "fasterrcnn_resnet50_voc07_pruned_best.pth")
+    # Simple step scheduler: decay LR at half and 3/4 of finetune epochs
+    if finetune_epochs >= 4:
+        milestones = [finetune_epochs // 2, (3 * finetune_epochs) // 4]
+    else:
+        milestones = [finetune_epochs]  # effectively no decay for very small epoch counts
 
-    for epoch in range(1, args.finetune_epochs + 1):
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        optimizer, milestones=milestones, gamma=0.1
+    )
+
+    best_map = 0.0
+
+    # ---------- Finetune loop (train + val eval) ----------
+
+    for epoch in range(1, finetune_epochs + 1):
+        print(f"\n=== Finetune Epoch {epoch}/{finetune_epochs} ===")
         train_one_epoch(
             model,
             optimizer,
@@ -155,30 +220,84 @@ def main():
         )
         lr_scheduler.step()
 
-        if epoch % args.eval_interval == 0:
-            print("\nEvaluating pruned+finetuned model on VOC07 val...")
-            mAP, _ = evaluate_map_voc(model, data_loader_val, device)
-            print(f"[Epoch {epoch}] Pruned+finetuned mAP@0.5 (val) = {mAP:.4f}")
+        print("\nEvaluating pruned model on VOC07 val...")
+        mAP, _ = evaluate_map_voc(model, data_loader_val, device)
 
-            if mAP > best_finetune_map:
-                best_finetune_map = mAP
-                torch.save(model.state_dict(), best_finetune_path)
-                print(f"New best pruned+finetuned mAP = {best_finetune_map:.4f}. Saved: {best_finetune_path}")
+        # Save best on val mAP
+        if mAP > best_map:
+            best_map = mAP
+            torch.save(model.state_dict(), pruned_best_ckpt)
+            print(f"[Finetune] New best mAP = {best_map:.4f}. Saved: {pruned_best_ckpt}")
 
-        # Save per-epoch checkpoint (optional)
-        epoch_ckpt_path = os.path.join(
-            args.output_dir,
-            f"fasterrcnn_resnet50_voc07_pruned_epoch{epoch}.pth",
-        )
-        torch.save(model.state_dict(), epoch_ckpt_path)
-        print(f"Saved pruned+finetuned checkpoint for epoch {epoch}: {epoch_ckpt_path}\n")
+        # Optional: per-epoch checkpoint (uncomment if you want them)
+        # ckpt_epoch_path = os.path.join(
+        #     pruned_ckpt_dir, f"fasterrcnn_resnet50_voc07_pruned_epoch{epoch}.pth"
+        # )
+        # torch.save(model.state_dict(), ckpt_epoch_path)
+        # print(f"[Finetune] Saved checkpoint: {ckpt_epoch_path}")
 
-    # After finetuning, remove pruning re-param and save a clean final model
-    remove_pruning(parameters_to_prune)
-    final_ckpt_path = os.path.join(args.output_dir, "fasterrcnn_resnet50_voc07_pruned_finetuned_final.pth")
-    torch.save(model.state_dict(), final_ckpt_path)
-    print(f"\nSaved final pruned & finetuned model (with pruning made permanent) to: {final_ckpt_path}")
+    print(f"\nBest pruned val mAP = {best_map:.4f}")
+    print(f"Loading best pruned checkpoint from: {pruned_best_ckpt}")
+    best_state_dict = torch.load(pruned_best_ckpt, map_location="cpu")
+    model.load_state_dict(best_state_dict)
+    model.to(device)
+
+    # ---------- Final evaluation on test ----------
+
+    print("\nEvaluating best pruned+finetuned model on VOC07 test...")
+    test_mAP, class_aps = evaluate_map_voc(model, data_loader_test, device)
+    print(f"\nFinal Test mAP (pruned+finetuned) = {test_mAP:.4f}")
+
+
+# ====================
+# 3. CLI entry point
+# ====================
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Prune and finetune Faster R-CNN ResNet50 on VOC07"
+    )
+    parser.add_argument("--index", type=int, default=0)
+    parser.add_argument(
+        "--prune-amount",
+        type=float,
+        default=0.3,
+        help="Fraction of Conv2d weights to prune globally (0.0–1.0)",
+    )
+    parser.add_argument(
+        "--finetune-epochs",
+        type=int,
+        default=20,
+        help="Number of finetuning epochs",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=1e-4,
+        help="Learning rate for finetuning",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=4,
+        help="Finetuning batch size",
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=4,
+        help="Number of dataloader workers",
+    )
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    prune_and_finetune(
+        index=args.index,
+        prune_amount=args.prune_amount,
+        finetune_epochs=args.finetune_epochs,
+        lr=args.lr,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+    )
