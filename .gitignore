@@ -26,3 +26,6 @@ tmp.py
 
 *.out
 *.err
+
+other/checkpoints/**
+other/metanetwork/**
