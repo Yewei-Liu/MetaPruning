@@ -557,9 +557,9 @@ def main():
     # Optional: freeze BN (same as pretraining script)
     freeze_backbone_bn(model.backbone)
 
-    # Evaluate before pruning
-    print("\nEvaluating best (unpruned) model on VOC07 val...")
-    evaluate_map_voc(model, data_loader_val, device)
+    # # Evaluate before pruning
+    # print("\nEvaluating best (unpruned) model on VOC07 val...")
+    # evaluate_map_voc(model, data_loader_val, device)
 
     # Apply pruning
     print("\nApplying global structured pruning...")
