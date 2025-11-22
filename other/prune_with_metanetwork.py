@@ -213,6 +213,20 @@ def freeze_backbone_bn(backbone: nn.Module):
             m.eval()
             for p in m.parameters():
                 p.requires_grad = False
+                
+def unfreeze_backbone_bn(backbone: nn.Module):
+    """
+    Restore BatchNorm layers to training mode and make their
+    affine parameters (weight, bias) trainable again.
+    """
+    for m in backbone.modules():
+        if isinstance(m, nn.BatchNorm2d):
+            # enable running stats update
+            m.train()
+
+            # enable learning for weight & bias
+            for p in m.parameters():
+                p.requires_grad = True
 
 
 # -----------------------------
@@ -557,9 +571,8 @@ def main():
     model.load_state_dict(state_dict)
     model.to(device)
 
-    # Optional: freeze BN (same as pretraining script)
-    freeze_backbone_bn(model.backbone)
-
+    unfreeze_backbone_bn(model.backbone)
+    
     # # Evaluate before pruning
     # print("\nEvaluating best (unpruned) model on VOC07 val...")
     # evaluate_map_voc(model, data_loader_val, device)
@@ -575,6 +588,7 @@ def main():
     state_dict = graph_to_state_dict(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
     model = state_dict_to_model(model_name, state_dict, device)
 
+    freeze_backbone_bn(model.backbone)
 
     print("\nEvaluating after metanetwork on VOC07 val...")
     evaluate_map_voc(model, data_loader_val, device)
@@ -628,11 +642,13 @@ def main():
     print("\nEvaluating final finetuned model on VOC07 test...")
     evaluate_map_voc(model, data_loader_test, device)
 
+    unfreeze_backbone_bn(model.backbone)
     # Apply pruning
     print("\nApplying global structured pruning...")
     speed_up, model = progressive_pruning(model, "IMAGENET", None, None, args.speed_up, "group_l2_norm_max_normalizer", False, device,
                                           False, False, None, False)
     print(f"Pruning completed. Speed up: {speed_up:.2f}")
+    freeze_backbone_bn(model.backbone)
     
     # Evaluate immediately after pruning (before finetune)
     print("\nEvaluating pruned (not finetuned) model on VOC07 val...")

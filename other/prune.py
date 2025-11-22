@@ -213,6 +213,19 @@ def freeze_backbone_bn(backbone: nn.Module):
             for p in m.parameters():
                 p.requires_grad = False
 
+def unfreeze_backbone_bn(backbone: nn.Module):
+    """
+    Restore BatchNorm layers to training mode and make their
+    affine parameters (weight, bias) trainable again.
+    """
+    for m in backbone.modules():
+        if isinstance(m, nn.BatchNorm2d):
+            # enable running stats update
+            m.train()
+
+            # enable learning for weight & bias
+            for p in m.parameters():
+                p.requires_grad = True
 
 # -----------------------------
 # 4. VOC mAP evaluation
@@ -553,19 +566,19 @@ def main():
     state_dict = torch.load(best_model_path, map_location=device)
     model.load_state_dict(state_dict)
     model.to(device)
+    
+    unfreeze_backbone_bn(model.backbone)
 
-    # Optional: freeze BN (same as pretraining script)
-    freeze_backbone_bn(model.backbone)
-
-    # # Evaluate before pruning
-    # print("\nEvaluating best (unpruned) model on VOC07 val...")
-    # evaluate_map_voc(model, data_loader_val, device)
+    # Evaluate before pruning
+    print("\nEvaluating best (unpruned) model on VOC07 val...")
+    evaluate_map_voc(model, data_loader_val, device)
 
     # Apply pruning
     print("\nApplying global structured pruning...")
-    speed_up, model = progressive_pruning(model, "IMAGENET", None, None, args.speed_up, "group_l2_norm_max_normalizer", False, device,
+    speed_up, model.backbone = progressive_pruning(model.backbone, "VOC07", None, None, args.speed_up, "group_l2_norm_max_normalizer", False, device,
                                           False, False, None, False)
     print(f"Pruning completed. Speed up: {speed_up:.2f}")
+    freeze_backbone_bn(model.backbone)
 
     # Evaluate immediately after pruning (before finetune)
     print("\nEvaluating pruned (not finetuned) model on VOC07 val...")
