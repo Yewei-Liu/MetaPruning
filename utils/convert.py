@@ -929,12 +929,9 @@ def resnet50_state_dict_to_model(state_dict, device, detection=False):
     else:
         res = torch.nn.Sequential(*list(res.children())[:-2])
         res.out_channels = 2048
-        for i, (key, val) in enumerate(res.state_dict().items()):
-            if i < 6:
-                origin_key = key[2:]
-            else:
-                origin_key = key[4:]
-            res.state_dict()[key] = state_dict[origin_key].to(device)
+        for key1, val1, key2, val2 in zip(res.state_dict().keys(), res.state_dict().values(), state_dict.keys(), state_dict.values()):
+            assert val1.shape == val2.shape, f"{key1} shape {val1.shape} != {key2} shape {val2.shape}"
+            res.state_dict()[key1] = deepcopy(val2).to(device)
     return res
 
 
