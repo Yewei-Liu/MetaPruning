@@ -486,6 +486,11 @@ def parse_args():
                         help="milestones (epochs) for MultiStepLR during finetune")
     return parser.parse_args()
 
+def print_gpu_usage(msg=""):
+    if torch.cuda.is_available():
+        allocated = torch.cuda.memory_allocated() / 1024**3
+        reserved  = torch.cuda.memory_reserved() / 1024**3
+        print(f"[GPU] {msg} allocated: {allocated:.2f} GB | reserved: {reserved:.2f} GB")
 
 # -----------------------------
 # 8. Main: load, prune, finetune
@@ -581,13 +586,18 @@ def main():
     if isinstance(metanetwork, dict):
         metanetwork = metanetwork['model']
     print('load metanetwork from metanetwork.pth')
+    print_gpu_usage("Before metanetwork")
     model_name = "resnet50_detection"
     origin_state_dict = model.backbone.state_dict()
-    node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, origin_state_dict, device)
-    node_pred, edge_pred = metanetwork.forward(node_features, edge_index, edge_features_list)
-    state_dict = graph_to_state_dict(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
-    model.backbone = state_dict_to_model(model_name, state_dict, device)
-
+    with torch.no_grad():
+        node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, origin_state_dict, device)
+        print_gpu_usage("After graph conversion")
+        node_pred, edge_pred = metanetwork.forward(node_features, edge_index, edge_features_list)
+        print_gpu_usage("After metanetwork forward")
+        state_dict = graph_to_state_dict(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
+        print_gpu_usage("After graph to state_dict conversion")
+        model.backbone = state_dict_to_model(model_name, state_dict, device)
+    print_gpu_usage("After metanetwork")
     freeze_backbone_bn(model.backbone)
     model.to(device)
 
