@@ -20,6 +20,7 @@ main_imagenet/main_imagenet.log
 __pycache__/
 nohup.out
 *.egg-info
+other
 
 tmp/
 tmp.py
