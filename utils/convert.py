@@ -923,8 +923,8 @@ def resnet50_state_dict_to_model(state_dict, device, detection=False):
             node_index.append(node_index[-1] + len(val))
         t += 1
     node_num = [node_index[i + 1] - node_index[i] for i in range(len(node_index) - 1)]
+    res = MyResNetDeep(node_num, [3, 4, 6, 3]).eval().to(device)
     if not detection:
-        res = MyResNetDeep(node_num, [3, 4, 6, 3]).eval().to(device)
         res.load_state_dict(state_dict)
     else:
         res = torch.nn.Sequential(*list(res.children())[:-2])
