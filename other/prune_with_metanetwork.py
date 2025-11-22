@@ -569,7 +569,7 @@ def main():
     model = get_faster_rcnn_resnet50(num_classes=num_classes)
     state_dict = torch.load(best_model_path, map_location='cpu')
     model.load_state_dict(state_dict)
-    model.to(device)
+    model.to("cpu")
 
     unfreeze_backbone_bn(model.backbone)
     
@@ -589,6 +589,7 @@ def main():
     model.backbone = state_dict_to_model(model_name, state_dict, device)
 
     freeze_backbone_bn(model.backbone)
+    model.to(device)
 
     print("\nEvaluating after metanetwork on VOC07 val...")
     evaluate_map_voc(model, data_loader_val, device)
