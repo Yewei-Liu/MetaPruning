@@ -27,7 +27,6 @@ def progressive_pruning(
     '''
     Pruning to a fixed speed up.
     '''
-    
     if device is None:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model.eval().to(device)
@@ -35,6 +34,8 @@ def progressive_pruning(
         example_inputs = torch.ones((1, 3, 32, 32)).to(device)
     elif dataset_name.lower() in ['imagenet', 'cifar10(224)']:
         example_inputs = torch.ones((1, 3, 224, 224)).to(device)
+    elif dataset_name.lower() in ['voc07']:
+        example_inputs = torch.ones((1, 3, 1000, 800)).to(device)
     else:
         raise NotImplementedError(f"Dataset {dataset_name} is not supported.")
     pruner = get_pruner(model, example_inputs, 0.1, dataset_name, method=method, special_type=special_type)

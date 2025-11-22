@@ -21,6 +21,8 @@ def state_dict_to_graph(model_name, state_dict, device=None):
         return resnet26_state_dict_to_graph(state_dict, device)
     elif model_name == 'resnet50':
         return resnet50_state_dict_to_graph(state_dict, device)
+    elif model_name == 'resnet50_detection':
+        return resnet50_state_dict_to_graph(state_dict, device, detection=True)
     elif model_name == 'vit_b_16':
         return ViT_B_16_state_dict_to_graph(state_dict, device)
     else:
@@ -39,6 +41,8 @@ def graph_to_state_dict(model_name, state_dict, node_index, node_features, edge_
         return resnet26_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
     elif model_name == 'resnet50':
         return resnet50_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
+    elif model_name == 'resnet50_detection':
+        return resnet50_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device, detection=True)
     elif model_name == 'vit_b_16':
         return ViT_B_16_graph_to_state_dict(state_dict, node_index, node_features, edge_index, edge_features, device)
     else:
@@ -57,6 +61,8 @@ def state_dict_to_model(model_name, state_dict, device='cuda'):
         return resnet26_state_dict_to_model(state_dict, device)
     elif model_name == 'resnet50':
         return resnet50_state_dict_to_model(state_dict, device)
+    elif model_name == 'resnet50_detection':
+        return resnet50_state_dict_to_model(state_dict, device, detection=True)
     elif model_name == 'vit_b_16':
         return ViT_B_16_state_dict_to_model(state_dict, device)
     else:
@@ -734,7 +740,7 @@ def resnet26_state_dict_to_model(state_dict, device):
     res.load_state_dict(state_dict)
     return res
 
-def resnet50_state_dict_to_graph(state_dict, device=None):
+def resnet50_state_dict_to_graph(state_dict, device=None, detection=False):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -779,6 +785,8 @@ def resnet50_state_dict_to_graph(state_dict, device=None):
             elif t % 6 == 4:
                 node_features[node_index[-2]: node_index[-1]][:, 7] = val
         elif t >=  318:
+            if detection:
+                break
             # End
             if t == 318:
                 node_index.append(node_index[-1] + len(val))
@@ -851,7 +859,8 @@ def resnet50_graph_to_state_dict(
         node_features : torch.tensor, 
         edge_index : torch.tensor, 
         edge_features_list : torch.tensor,
-        device = None
+        device = None,
+        detection = False
         ):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -891,14 +900,15 @@ def resnet50_graph_to_state_dict(
         elif t % 6 == 2:
             state_dict[key] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 1]
         t += 1
-    edge_idx_1 += node_num[-1] * node_num[-2]
-    state_dict['fc.weight'] = edge_features_1[-node_num[-1] * node_num[-2]:].reshape(node_num[-1], node_num[-2])
-    state_dict['fc.bias'] = node_features[node_index[-2]: node_index[-1]][:, 1]
+    if not detection:
+        edge_idx_1 += node_num[-1] * node_num[-2]
+        state_dict['fc.weight'] = edge_features_1[-node_num[-1] * node_num[-2]:].reshape(node_num[-1], node_num[-2])
+        state_dict['fc.bias'] = node_features[node_index[-2]: node_index[-1]][:, 1]
     for key, val in state_dict.items():
         state_dict[key] = val.to(device)
     return state_dict
 
-def resnet50_state_dict_to_model(state_dict, device):
+def resnet50_state_dict_to_model(state_dict, device, detection=False):
     node_index = [0, 3]
     t = 0
     for key, val in state_dict.items():
@@ -914,6 +924,9 @@ def resnet50_state_dict_to_model(state_dict, device):
         t += 1
     node_num = [node_index[i + 1] - node_index[i] for i in range(len(node_index) - 1)]
     res = MyResNetDeep(node_num, [3, 4, 6, 3]).eval().to(device)
+    if detection:
+        res = torch.nn.Sequential(*list(res.children())[:-2])
+        res.out_channels = 2048
     res.load_state_dict(state_dict)
     return res
 
