@@ -599,6 +599,7 @@ def main():
         model.backbone = state_dict_to_model(model_name, state_dict, device)
     print_gpu_usage("After metanetwork")
     model.to(device)
+    freeze_backbone_bn(model.backbone)
 
     print("\nEvaluating after metanetwork on VOC07 val...")
     evaluate_map_voc(model, data_loader_val, device)
@@ -652,6 +653,7 @@ def main():
     print("\nEvaluating final finetuned model on VOC07 test...")
     evaluate_map_voc(model, data_loader_test, device)
 
+    unfreeze_backbone_bn(model.backbone)
     # Apply pruning
     print("\nApplying global structured pruning...")
     speed_up, model.backbone = progressive_pruning(model.backbone, "IMAGENET", None, None, args.speed_up, "group_l2_norm_max_normalizer", False, device,
