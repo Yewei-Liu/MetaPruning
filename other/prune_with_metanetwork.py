@@ -567,7 +567,7 @@ def main():
 
     # Model
     model = get_faster_rcnn_resnet50(num_classes=num_classes)
-    state_dict = torch.load(best_model_path, map_location=device)
+    state_dict = torch.load(best_model_path, map_location='cpu')
     model.load_state_dict(state_dict)
     model.to(device)
 
@@ -582,11 +582,11 @@ def main():
         metanetwork = metanetwork['model']
     print('load metanetwork from metanetwork.pth')
     model_name = "resnet50_detection"
-    origin_state_dict = model.state_dict()
+    origin_state_dict = model.backbone.state_dict()
     node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, origin_state_dict, device)
     node_pred, edge_pred = metanetwork.forward(node_features, edge_index, edge_features_list)
     state_dict = graph_to_state_dict(model_name, origin_state_dict, node_index, node_pred, edge_index, edge_pred, device)
-    model = state_dict_to_model(model_name, state_dict, device)
+    model.backbone = state_dict_to_model(model_name, state_dict, device)
 
     freeze_backbone_bn(model.backbone)
 
@@ -645,7 +645,7 @@ def main():
     unfreeze_backbone_bn(model.backbone)
     # Apply pruning
     print("\nApplying global structured pruning...")
-    speed_up, model = progressive_pruning(model, "IMAGENET", None, None, args.speed_up, "group_l2_norm_max_normalizer", False, device,
+    speed_up, model.backbone = progressive_pruning(model.backbone, "IMAGENET", None, None, args.speed_up, "group_l2_norm_max_normalizer", False, device,
                                           False, False, None, False)
     print(f"Pruning completed. Speed up: {speed_up:.2f}")
     freeze_backbone_bn(model.backbone)
