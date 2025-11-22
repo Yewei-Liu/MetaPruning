@@ -582,10 +582,10 @@ def main():
     # print("\nEvaluating best (unpruned) model on VOC07 val...")
     # evaluate_map_voc(model, data_loader_val, device)
     
-    metanetwork = torch.load("metanetwork.pth", weights_only=False, map_location=device)
+    metanetwork = torch.load(f"metanetwork_{args.index}.pth", weights_only=False, map_location=device)
     if isinstance(metanetwork, dict):
         metanetwork = metanetwork['model']
-    print('load metanetwork from metanetwork.pth')
+    print(f'load metanetwork from metanetwork_{args.index}.pth')
     print_gpu_usage("Before metanetwork")
     model_name = "resnet50_detection"
     origin_state_dict = model.backbone.state_dict()
