@@ -26,7 +26,7 @@ HIDDIM=16
 IN_NODE_DIM=8
 NODE_RES_RATIO=0.002
 EDGE_RES_RATIO=0.002
-
+METATRAIN_LR_DECAY_MILESTONES=\'300000\'
 
 NUM_GPUS=8
 MASTER_PORT=18900             
@@ -63,6 +63,7 @@ torchrun \
     metanetwork.in_node_dim=$IN_NODE_DIM \
     metanetwork.node_res_ratio=$NODE_RES_RATIO \
     metanetwork.edge_res_ratio=$EDGE_RES_RATIO \
+    meta_train.lr_decay_milestones=$METATRAIN_LR_DECAY_MILESTONES \
     model=$MODEL \
     run=$RUN_TYPE \
     data_model_num=$DATA_MODEL_NUM \
