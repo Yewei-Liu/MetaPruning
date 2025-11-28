@@ -17,7 +17,7 @@
 
 MODEL="resnet50"  
 INDEX=2
-METANETWORK_INDEX=16
+METANETWORK_INDEX=15
 RUN_TYPE="visualize"                
 NAME=FinalResnet
 RESUME_EPOCH=-1
