@@ -17,6 +17,9 @@ RUN_TYPE="prune_after_metanetwork"
 NAME=Large 
 SPEED_UP=2.3095
 RESUME_EPOCH=-1
+LR=0.01
+EPOCHS=200
+LR_DECAY_MILESTONES=\'120,160,185\'
 
 NUM_GPUS=8                     
 MASTER_PORT=18900             
@@ -53,5 +56,8 @@ torchrun \
     name=$NAME \
     speed_up=$SPEED_UP \
     resume_epoch=$RESUME_EPOCH \
+    lr=$LR \
+    lr_decay_milestones=$LR_DECAY_MILESTONES \
+    epochs=$EPOCHS \
     +metanetwork_index=$METANETWORK_INDEX \
     > "save/${NAME}/${RUN_TYPE}/${INDEX}/metanetwork_${METANETWORK_INDEX}/${SPEED_UP}/prune.log" 2>&1
