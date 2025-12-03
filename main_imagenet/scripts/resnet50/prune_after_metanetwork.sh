@@ -12,9 +12,9 @@
 
 MODEL="resnet50"  
 INDEX=2
-METANETWORK_INDEX=15
+METANETWORK_INDEX=16
 RUN_TYPE="prune_after_metanetwork"                
-NAME=Large 
+NAME=FinalResnet
 SPEED_UP=2.3095
 RESUME_EPOCH=-1
 LR=0.01
