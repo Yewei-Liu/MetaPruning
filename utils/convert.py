@@ -1092,9 +1092,10 @@ def ViT_B_16_state_dict_to_graph(state_dict, device=None):
                     edge_features_3 = torch.concatenate([val[:tmp_dim, :].reshape(-1, 1), val[tmp_dim: 2 * tmp_dim, :].reshape(-1, 1), val[2 * tmp_dim:, :].reshape(-1, 1)], dim=1)
             elif t % 12 == 8:
                 new_node_features = torch.zeros((len(val) // 3, 6))
-                new_node_features[:, 3] = val[0::3]
-                new_node_features[:, 4] = val[1::3]
-                new_node_features[:, 5] = val[2::3]
+                tmp_dim = len(val) // 3
+                new_node_features[:, 3] = val[:tmp_dim]
+                new_node_features[:, 4] = val[tmp_dim:2*tmp_dim]
+                new_node_features[:, 5] = val[2*tmp_dim:3*tmp_dim]
                 node_features = torch.concatenate([node_features, new_node_features]) if node_features is not None else new_node_features
             elif t % 12 == 9:
                 node_index.append(node_index[-1] + val.shape[0])
@@ -1192,9 +1193,10 @@ def ViT_B_16_graph_to_state_dict(
                 state_dict[key] = torch.concatenate([Q, K, V], dim=0)
                 edge_idx_3 += tmp_dim
             elif t % 12 == 8:
-                state_dict[key][0::3] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 3]
-                state_dict[key][1::3] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 4]
-                state_dict[key][2::3] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 5]
+                tmp_dim = val.shape[0] // 3
+                state_dict[key][:tmp_dim] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 3]
+                state_dict[key][tmp_dim:2*tmp_dim] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 4]
+                state_dict[key][2*tmp_dim:3*tmp_dim] = node_features[node_index[node_idx]: node_index[node_idx + 1]][:, 5]
                 node_idx += 1
             elif t % 12 == 9:
                 tmp_dim = val.shape[0] * val.shape[1]
@@ -1268,15 +1270,15 @@ def ViT_B_16_state_dict_to_model(state_dict, device):
 if __name__ == "__main__":
     print("Allocated:", torch.cuda.memory_allocated() / 1024**2, "MB")
     print("Reserved:", torch.cuda.memory_reserved() / 1024**2, "MB")
-    model_name='resnet26'
-    res = myresnet26(1000)
-    node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, res.state_dict(), device='cuda')
+    model_name='vit_b_16'
+    vit = vit_b_16(1000)
+    node_index, node_features, edge_index, edge_features_list = state_dict_to_graph(model_name, vit.state_dict(), device='cuda')
     print("Allocated:", torch.cuda.memory_allocated() / 1024**2, "MB")
     print("Reserved:", torch.cuda.memory_reserved() / 1024**2, "MB")
-    # new_model = graph_to_model(model_name, res.state_dict(), node_index, node_features, edge_index, edge_features_list)
-    # for key in res.state_dict().keys():
-    #     if not torch.equal(res.state_dict()[key], new_model.state_dict()[key]):
-    #         print(f"Not equal at {key}")
-    #         print(res.state_dict()[key])
-    #         print(new_model.state_dict()[key])
-    # print("Done!")
+    new_model = graph_to_model(model_name, vit.state_dict(), node_index, node_features, edge_index, edge_features_list)
+    for key in vit.state_dict().keys():
+        if not torch.equal(vit.state_dict()[key], new_model.state_dict()[key]):
+            print(f"Not equal at {key}")
+            print(vit.state_dict()[key])
+            print(new_model.state_dict()[key])
+    print("Done!")
